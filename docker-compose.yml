@@ -1,0 +1,20 @@
+services:
+  ivansterm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ivansterm_app
+    container_name: ivansterm
+    ports:
+      - "8099:8000"   # 웹 서비스
+      - "1044:22"     # SSH 접속 (유지보수용)
+    env_file:
+      - .env
+    volumes:
+      # 소스 코드 마운트 (유지보수/업데이트 시 반영용)
+      - .:/app
+      # node_modules 보호 (호스트와 격리)
+      - /app/frontend/node_modules
+      # SQLite DB 영속화
+      - ./db_data:/app/db_data
+    restart: always

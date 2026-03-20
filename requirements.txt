@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic-settings
+
+# Database
+sqlalchemy
+aiosqlite
+
+# SSH/SFTP
+asyncssh
+
+# Security
+cryptography
+
+# File upload
+python-multipart
