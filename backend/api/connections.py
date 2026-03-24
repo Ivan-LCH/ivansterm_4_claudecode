@@ -23,10 +23,15 @@ class ConnectionCreate(BaseModel):
     password: Optional[str] = None
     private_key_path: Optional[str] = None
     last_working_dir: str = "~"
+    service_url: Optional[str] = None
 
 
 class ConnectionUpdate(ConnectionCreate):
     pass
+
+
+class WorkdirUpdate(BaseModel):
+    path: str
 
 
 class ConnectionOut(BaseModel):
@@ -38,6 +43,7 @@ class ConnectionOut(BaseModel):
     auth_method: str
     private_key_path: Optional[str] = None
     last_working_dir: str = "~"
+    service_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -61,6 +67,7 @@ async def create_connection(data: ConnectionCreate, db: AsyncSession = Depends(g
         password_encrypted=encrypt(data.password) if data.password else None,
         private_key_path=data.private_key_path,
         last_working_dir=data.last_working_dir,
+        service_url=data.service_url or None,
     )
     db.add(conn)
     await db.commit()
@@ -89,12 +96,24 @@ async def update_connection(conn_id: int, data: ConnectionUpdate, db: AsyncSessi
     conn.auth_method = data.auth_method
     conn.private_key_path = data.private_key_path
     conn.last_working_dir = data.last_working_dir
+    conn.service_url = data.service_url or None
     if data.password:
         conn.password_encrypted = encrypt(data.password)
 
     await db.commit()
     await db.refresh(conn)
     return conn
+
+
+@router.patch("/{conn_id}/workdir")
+async def update_workdir(conn_id: int, data: WorkdirUpdate, db: AsyncSession = Depends(get_db)):
+    """마지막 작업 디렉토리 저장"""
+    conn = await db.get(Connection, conn_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    conn.last_working_dir = data.path
+    await db.commit()
+    return {"detail": "Updated"}
 
 
 @router.delete("/{conn_id}")

@@ -8,6 +8,7 @@ export interface ConnectionInfo {
   auth_method: "password" | "key";
   private_key_path?: string;
   last_working_dir: string;
+  service_url?: string;
 }
 
 export interface ConnectionCreate {
@@ -19,6 +20,7 @@ export interface ConnectionCreate {
   password?: string;
   private_key_path?: string;
   last_working_dir: string;
+  service_url?: string;
 }
 
 // 터미널 설정
@@ -65,6 +67,41 @@ export interface FileNode {
   children?: FileNode[];
   expanded?: boolean;
   loading?: boolean;
+}
+
+// 에디터 커스텀 컬러
+export interface EditorCustomColors {
+  "editor.background"?: string;
+  "editor.foreground"?: string;
+  "editor.lineHighlightBackground"?: string;
+  "editor.selectionBackground"?: string;
+  "editorCursor.foreground"?: string;
+  "editorLineNumber.foreground"?: string;
+  "editorLineNumber.activeForeground"?: string;
+}
+
+// 에디터 설정
+export interface EditorSettings {
+  fontSize: number;
+  fontFamily: string;
+  lineHeight: number;
+  tabSize: number;
+  wordWrap: "on" | "off" | "wordWrapColumn";
+  minimap: boolean;
+  renderLineHighlight: "none" | "gutter" | "line" | "all";
+  theme: string; // Monaco 테마 이름
+  customColors: EditorCustomColors;
+}
+
+// 파일 전송 상태 (StatusBar 표시용)
+export interface TransferStatus {
+  fileName: string;
+  direction: "upload" | "download";
+  state: "progress" | "success" | "fail";
+  fileSize?: number;
+  /** 다중 파일 업로드 시 진행 카운트 */
+  current?: number;
+  total?: number;
 }
 
 // 에디터 탭

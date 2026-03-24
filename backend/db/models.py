@@ -14,6 +14,7 @@ class Connection(Base):
     password_encrypted = Column(Text, nullable=True)
     private_key_path = Column(Text, nullable=True)
     last_working_dir = Column(String(500), default="~")
+    service_url = Column(String(500), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

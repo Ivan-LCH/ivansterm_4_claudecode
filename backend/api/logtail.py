@@ -79,9 +79,9 @@ async def logtail_websocket(websocket: WebSocket, conn_id: int):
                     tail_process = None
 
                 file_path = cmd["path"]
-                # tail -f 시작 (마지막 100줄부터)
+                # tail -f 시작 (마지막 10줄 컨텍스트 후 이어서 스트리밍)
                 tail_process = await ssh_conn.create_process(
-                    f"tail -n 100 -f {file_path}",
+                    f"tail -n 10 -f {file_path}",
                     stderr=asyncssh.STDOUT,
                 )
 

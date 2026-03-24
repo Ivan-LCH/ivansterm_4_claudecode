@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
@@ -12,7 +13,7 @@ router = APIRouter()
 
 
 @router.websocket("/ws/terminal")
-async def terminal_websocket(websocket: WebSocket, conn_id: int):
+async def terminal_websocket(websocket: WebSocket, conn_id: int, session_id: str = ""):
     """SSH 터미널 WebSocket 엔드포인트
 
     클라이언트 → 서버 메시지:
@@ -43,7 +44,11 @@ async def terminal_websocket(websocket: WebSocket, conn_id: int):
     session_key = f"terminal_{conn_id}_{id(websocket)}"
 
     try:
-        # SSH 연결
+        # tmux 세션 이름: session_id가 있으면 세션별 고유 tmux 사용 (재접속 시 새 터미널 보장)
+        safe_sid = re.sub(r"[^a-zA-Z0-9_-]", "_", session_id)[:16] if session_id else ""
+        tmux_name = f"ivan_{conn_id}_{safe_sid}" if safe_sid else f"ivan_{conn_id}"
+
+        # SSH 연결 (tmux 세션 자동 연결)
         session = await ssh_manager.connect(
             session_key=session_key,
             host=host,
@@ -51,13 +56,10 @@ async def terminal_websocket(websocket: WebSocket, conn_id: int):
             username=username,
             password=password if auth_method == "password" else None,
             private_key_path=private_key_path if auth_method == "key" else None,
+            tmux_session=tmux_name,
         )
 
         process = session.process
-
-        # Working Directory로 이동
-        if working_dir and working_dir != "~":
-            process.stdin.write(f"cd {working_dir}\n".encode())
 
         # stdout → WebSocket 전송 태스크
         async def read_stdout():
@@ -86,9 +88,25 @@ async def terminal_websocket(websocket: WebSocket, conn_id: int):
             except Exception:
                 pass
 
-        # 백그라운드 읽기 태스크 시작
+        # WebSocket ping (연결 유지용 — idle 끊김 방지)
+        async def ping_loop():
+            try:
+                while True:
+                    await asyncio.sleep(20)
+                    await websocket.send_json({"type": "ping"})
+            except Exception:
+                pass
+
+        # 백그라운드 읽기 태스크 먼저 시작 (초기 출력 포워딩)
         stdout_task = asyncio.create_task(read_stdout())
         stderr_task = asyncio.create_task(read_stderr())
+        ping_task = asyncio.create_task(ping_loop())
+
+        # 신규 tmux 세션일 때만 Working Directory로 이동
+        # 기존 세션 attach(리프레시/재연결) 시에는 cd 미전송 — Claude 실행 중 입력 방지
+        if session.is_new_tmux and working_dir and working_dir != "~":
+            await asyncio.sleep(0.5)
+            process.stdin.write(f"cd {working_dir}\n".encode())
 
         # WebSocket → SSH stdin
         try:
@@ -125,6 +143,7 @@ async def terminal_websocket(websocket: WebSocket, conn_id: int):
         # 읽기 태스크 정리
         stdout_task.cancel()
         stderr_task.cancel()
+        ping_task.cancel()
 
     except Exception as e:
         try:

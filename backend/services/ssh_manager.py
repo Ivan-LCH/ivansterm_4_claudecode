@@ -9,6 +9,7 @@ class SSHSession:
     """단일 SSH 세션 (연결 + PTY 프로세스)"""
     connection: asyncssh.SSHClientConnection
     process: Optional[asyncssh.SSHClientProcess] = None
+    is_new_tmux: bool = True  # 신규 tmux 세션이면 True, 기존 세션 attach면 False
 
     async def close(self):
         if self.process:
@@ -33,6 +34,7 @@ class SSHManager:
         private_key_path: Optional[str] = None,
         cols: int = 80,
         rows: int = 24,
+        tmux_session: Optional[str] = None,
     ) -> SSHSession:
         """SSH 연결 생성 및 PTY 프로세스 시작"""
         # 기존 세션 정리
@@ -52,14 +54,27 @@ class SSHManager:
 
         conn = await asyncssh.connect(**kwargs)
 
+        # tmux 세션 신규 여부 판별 (attach이면 cd 전송 안 함)
+        is_new_tmux = True
+        if tmux_session:
+            check = await conn.run(
+                f"tmux has-session -t {tmux_session} 2>/dev/null",
+                check=False,
+            )
+            is_new_tmux = check.exit_status != 0  # 0=기존 존재, 비0=신규
+            command = f"tmux new-session -A -s {tmux_session} || bash"
+        else:
+            command = None
+
         # PTY 할당하여 인터랙티브 셸 시작
         process = await conn.create_process(
+            command,
             term_type="xterm-256color",
             term_size=(cols, rows),
             encoding=None,  # 바이너리 모드
         )
 
-        session = SSHSession(connection=conn, process=process)
+        session = SSHSession(connection=conn, process=process, is_new_tmux=is_new_tmux)
         self._sessions[session_key] = session
         return session
 

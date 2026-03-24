@@ -18,12 +18,14 @@ interface ConnectionModalProps {
     auth_method: "password" | "key";
     private_key_path?: string;
     last_working_dir: string;
+    service_url?: string;
   };
   onSubmit: (data: ConnectionCreate) => Promise<void>;
+  onSaveAsNew?: (data: ConnectionCreate) => Promise<void>;
   onClose: () => void;
 }
 
-export default function ConnectionModal({ initialData, onSubmit, onClose }: ConnectionModalProps) {
+export default function ConnectionModal({ initialData, onSubmit, onSaveAsNew, onClose }: ConnectionModalProps) {
   const isEditMode = !!initialData;
   const [form, setForm] = useState<ConnectionCreate>({
     name: initialData?.name || "",
@@ -34,6 +36,7 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
     password: "",
     private_key_path: initialData?.private_key_path || "",
     last_working_dir: initialData?.last_working_dir || "~",
+    service_url: initialData?.service_url || "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -140,17 +143,29 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
     setSubmitting(true);
     try {
       if (tempConnId) {
-        // 이미 접속이 생성되어 있으면 업데이트 후 사용
         await fetch(`/api/connections/${tempConnId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
         });
-        // onSubmit에 id를 포함해서 전달하기 위해 기존 것을 사용
         await onSubmit({ ...form, _existingId: tempConnId } as any);
       } else {
         await onSubmit(form);
       }
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Failed to save");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveAsNew = async () => {
+    if (!onSaveAsNew) return;
+    setError("");
+    setSubmitting(true);
+    try {
+      await onSaveAsNew(form);
       onClose();
     } catch (err: any) {
       setError(err.message || "Failed to save");
@@ -169,23 +184,23 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
     onClose();
   };
 
-  const inputClass = "w-full px-3 py-2 bg-[#313244] text-[#cdd6f4] border border-[#45475a] rounded focus:outline-none focus:border-[#89b4fa]";
+  const inputClass = "w-full px-3 py-2 bg-[#3f3f46] text-[#f4f4f5] border border-[#3f3f46] rounded focus:outline-none focus:border-[#3b82f6]";
 
   // 디렉토리 브라우저 뷰
   if (browsing) {
     return (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={handleClose}>
         <div
-          className="bg-[#1e1e2e] border border-[#313244] rounded-lg p-6 w-full max-w-lg shadow-xl"
+          className="bg-[#09090b] border border-[#3f3f46] rounded-lg p-6 w-full max-w-lg shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <h2 className="text-lg font-semibold text-[#cdd6f4] mb-2">Select Working Directory</h2>
+          <h2 className="text-lg font-semibold text-[#f4f4f5] mb-2">Select Working Directory</h2>
 
           {/* 현재 경로 */}
-          <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#313244] rounded text-sm text-[#cdd6f4]">
+          <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#3f3f46] rounded text-sm text-[#f4f4f5]">
             <button
               onClick={navigateUp}
-              className="text-[#89b4fa] hover:text-[#74c7ec] shrink-0"
+              className="text-[#3b82f6] hover:text-[#74c7ec] shrink-0"
               title="Parent directory"
             >
               ..
@@ -194,9 +209,9 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
           </div>
 
           {/* 디렉토리 목록 */}
-          <div className="h-64 overflow-y-auto border border-[#313244] rounded mb-3">
+          <div className="h-64 overflow-y-auto border border-[#3f3f46] rounded mb-3">
             {browseLoading ? (
-              <div className="flex items-center justify-center h-full text-[#a6adc8] text-sm">
+              <div className="flex items-center justify-center h-full text-[#a1a1aa] text-sm">
                 Loading...
               </div>
             ) : (
@@ -204,10 +219,10 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
                 <div
                   key={entry.path}
                   onClick={() => entry.is_dir && navigateTo(entry.path)}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm border-b border-[#313244] last:border-0 ${
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm border-b border-[#3f3f46] last:border-0 ${
                     entry.is_dir
-                      ? "text-[#89b4fa] cursor-pointer hover:bg-[#313244]"
-                      : "text-[#585b70]"
+                      ? "text-[#3b82f6] cursor-pointer hover:bg-[#3f3f46]"
+                      : "text-[#52525b]"
                   }`}
                 >
                   <span className="shrink-0 w-4 text-center">
@@ -218,26 +233,26 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
               ))
             )}
             {!browseLoading && entries.length === 0 && (
-              <div className="flex items-center justify-center h-full text-[#585b70] text-sm">
+              <div className="flex items-center justify-center h-full text-[#52525b] text-sm">
                 Empty directory
               </div>
             )}
           </div>
 
-          {error && <p className="text-[#f38ba8] text-sm mb-2">{error}</p>}
+          {error && <p className="text-[#ef4444] text-sm mb-2">{error}</p>}
 
           <div className="flex justify-between">
             <button
               type="button"
               onClick={() => setBrowsing(false)}
-              className="px-4 py-2 text-sm text-[#a6adc8] hover:text-[#cdd6f4] transition-colors"
+              className="px-4 py-2 text-sm text-[#a1a1aa] hover:text-[#f4f4f5] transition-colors"
             >
               Back
             </button>
             <button
               type="button"
               onClick={selectDirectory}
-              className="px-4 py-2 text-sm bg-[#89b4fa] text-[#1e1e2e] rounded hover:bg-[#74c7ec] transition-colors"
+              className="px-4 py-2 text-sm bg-[#3b82f6] text-[#09090b] rounded hover:bg-[#74c7ec] transition-colors"
             >
               Select: {currentPath}
             </button>
@@ -251,14 +266,14 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={handleClose}>
       <div
-        className="bg-[#1e1e2e] border border-[#313244] rounded-lg p-6 w-full max-w-md shadow-xl"
+        className="bg-[#09090b] border border-[#3f3f46] rounded-lg p-6 w-full max-w-md shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-[#cdd6f4] mb-4">{isEditMode ? "Edit Connection" : "New Connection"}</h2>
+        <h2 className="text-lg font-semibold text-[#f4f4f5] mb-4">{isEditMode ? "Edit Connection" : "New Connection"}</h2>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm text-[#a6adc8] mb-1">Name</label>
+            <label className="block text-sm text-[#a1a1aa] mb-1">Name</label>
             <input
               type="text"
               required
@@ -271,7 +286,7 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
 
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
-              <label className="block text-sm text-[#a6adc8] mb-1">Host</label>
+              <label className="block text-sm text-[#a1a1aa] mb-1">Host</label>
               <input
                 type="text"
                 required
@@ -282,7 +297,7 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
               />
             </div>
             <div>
-              <label className="block text-sm text-[#a6adc8] mb-1">Port</label>
+              <label className="block text-sm text-[#a1a1aa] mb-1">Port</label>
               <input
                 type="number"
                 value={form.port}
@@ -293,7 +308,7 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
           </div>
 
           <div>
-            <label className="block text-sm text-[#a6adc8] mb-1">Username</label>
+            <label className="block text-sm text-[#a1a1aa] mb-1">Username</label>
             <input
               type="text"
               required
@@ -304,7 +319,7 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
           </div>
 
           <div>
-            <label className="block text-sm text-[#a6adc8] mb-1">Auth Method</label>
+            <label className="block text-sm text-[#a1a1aa] mb-1">Auth Method</label>
             <select
               value={form.auth_method}
               onChange={(e) => update("auth_method", e.target.value)}
@@ -317,7 +332,7 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
 
           {form.auth_method === "password" ? (
             <div>
-              <label className="block text-sm text-[#a6adc8] mb-1">Password</label>
+              <label className="block text-sm text-[#a1a1aa] mb-1">Password</label>
               <input
                 type="password"
                 value={form.password}
@@ -327,7 +342,7 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
             </div>
           ) : (
             <div>
-              <label className="block text-sm text-[#a6adc8] mb-1">Private Key Path</label>
+              <label className="block text-sm text-[#a1a1aa] mb-1">Private Key Path</label>
               <input
                 type="text"
                 value={form.private_key_path}
@@ -339,7 +354,7 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
           )}
 
           <div>
-            <label className="block text-sm text-[#a6adc8] mb-1">Working Directory</label>
+            <label className="block text-sm text-[#a1a1aa] mb-1">Working Directory</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -352,29 +367,50 @@ export default function ConnectionModal({ initialData, onSubmit, onClose }: Conn
                 type="button"
                 onClick={handleBrowse}
                 disabled={browseLoading}
-                className="px-3 py-2 text-sm bg-[#45475a] text-[#cdd6f4] rounded hover:bg-[#585b70] transition-colors shrink-0 disabled:opacity-50"
+                className="px-3 py-2 text-sm bg-[#3f3f46] text-[#f4f4f5] rounded hover:bg-[#52525b] transition-colors shrink-0 disabled:opacity-50"
               >
                 {browseLoading ? "..." : "Browse"}
               </button>
             </div>
           </div>
 
-          {error && <p className="text-[#f38ba8] text-sm">{error}</p>}
+          <div>
+            <label className="block text-sm text-[#a1a1aa] mb-1">Service URL <span className="text-[#52525b] text-xs">(선택, 세션 시작 시 Web Preview 자동 오픈)</span></label>
+            <input
+              type="text"
+              value={form.service_url || ""}
+              onChange={(e) => update("service_url", e.target.value)}
+              placeholder="http://localhost:3000"
+              className={inputClass}
+            />
+          </div>
+
+          {error && <p className="text-[#ef4444] text-sm">{error}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-sm text-[#a6adc8] hover:text-[#cdd6f4] transition-colors"
+              className="px-4 py-2 text-sm text-[#a1a1aa] hover:text-[#f4f4f5] transition-colors"
             >
               Cancel
             </button>
+            {isEditMode && onSaveAsNew && (
+              <button
+                type="button"
+                onClick={handleSaveAsNew}
+                disabled={submitting}
+                className="px-4 py-2 text-sm border border-[#3b82f6] text-[#3b82f6] rounded hover:bg-[#3b82f6]/10 transition-colors disabled:opacity-50"
+              >
+                {submitting ? "Saving..." : "Save as New"}
+              </button>
+            )}
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 text-sm bg-[#89b4fa] text-[#1e1e2e] rounded hover:bg-[#74c7ec] transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm bg-[#3b82f6] text-[#09090b] rounded hover:bg-[#74c7ec] transition-colors disabled:opacity-50"
             >
-              {submitting ? "Saving..." : isEditMode ? "Save & Connect" : "Save & Connect"}
+              {submitting ? "Saving..." : "Save & Connect"}
             </button>
           </div>
         </form>

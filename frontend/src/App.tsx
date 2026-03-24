@@ -1,45 +1,146 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import type { ImperativePanelHandle } from "react-resizable-panels";
 import { useConnections } from "./hooks/useConnections";
 import { useTerminalSettings } from "./hooks/useTerminalSettings";
+import { useEditorSettings } from "./hooks/useEditorSettings";
 import ConnectionModal from "./components/common/ConnectionModal";
 import SettingsModal from "./components/common/SettingsModal";
 import Sidebar from "./components/layout/Sidebar";
 import WorkspaceView from "./components/layout/WorkspaceView";
-import type { ConnectionInfo, ConnectionCreate } from "./types";
+import StatusBar from "./components/layout/StatusBar";
+import type { ConnectionInfo, ConnectionCreate, TransferStatus } from "./types";
+import type { FileOpenRequest, TailLogRequest } from "./components/editor/EditorPanel";
+import type { WorkspaceViewRef } from "./components/layout/WorkspaceView";
+
+const SESSION_STORAGE_KEY = "ivansterm_sessions";
+const CURRENT_SESSION_KEY = "ivansterm_current_session";
+const SIDEBAR_SIZE_KEY = "ivansterm_sidebar_size";
+
+function loadSidebarSize(): number {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_SIZE_KEY);
+    if (raw) return JSON.parse(raw) as number;
+  } catch { /* ignore */ }
+  return 14; // 기본값 (%)
+}
 
 interface Session {
-  connectionId: number;
+  sessionId: string;        // 고유 세션 ID (같은 서버 + 다른 디렉토리 = 다른 세션)
+  connectionId: number;     // DB 연결 ID (API 호출용)
   name: string;
   host: string;
   workingDir: string;
+  serviceUrl?: string;      // 세션 시작 시 자동 오픈할 Web Preview URL
+  disconnected?: boolean;
+}
+
+// 고유 세션 ID 생성
+function generateSessionId(connectionId: number): string {
+  return `sess_${connectionId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+// localStorage에서 세션 복원
+function loadSavedSessions(): Session[] {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Session[];
+      // 기존 데이터 마이그레이션: sessionId가 없으면 생성
+      return parsed.map((s) => ({
+        ...s,
+        sessionId: s.sessionId || generateSessionId(s.connectionId),
+      }));
+    }
+  } catch { /* ignore */ }
+  return [];
+}
+
+function loadSavedCurrentSession(): string | null {
+  try {
+    const raw = localStorage.getItem(CURRENT_SESSION_KEY);
+    if (raw) return JSON.parse(raw) as string;
+  } catch { /* ignore */ }
+  return null;
 }
 
 function App() {
   const { connections, createConnection, deleteConnection, refresh } = useConnections();
   const { settings: terminalSettings, updateSettings, resetSettings } = useTerminalSettings();
+  const { settings: editorSettings, updateSettings: updateEditorSettings, resetSettings: resetEditorSettings } = useEditorSettings();
   const [showModal, setShowModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentConnectionId, setCurrentConnectionId] = useState<number | null>(null);
+  const [sessions, setSessions] = useState<Session[]>(loadSavedSessions);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(loadSavedCurrentSession);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
+  // 세션별 재연결 트리거 (숫자 증가 시 reconnect 시도)
+  const [reconnectSignals, setReconnectSignals] = useState<Record<string, number>>({});
+  // 파일 전송 상태 (StatusBar 표시용)
+  const [transferStatus, setTransferStatus] = useState<TransferStatus | null>(null);
+  // 세션별 터미널 프리뷰 (사이드바 미니 터미널용)
+  const [terminalPreviews, setTerminalPreviews] = useState<Record<string, string[]>>({});
+  // 사이드바 FileTree → EditorPanel 파일 열기/로그 요청
+  const [fileOpenRequest, setFileOpenRequest] = useState<FileOpenRequest | null>(null);
+  const [tailLogRequest, setTailLogRequest] = useState<TailLogRequest | null>(null);
+  // EditorPanel "Files" 버튼 → Sidebar Files 탭 열기 신호
+  const [fileTreeOpenSignal, setFileTreeOpenSignal] = useState(0);
+  // Sidebar Web 탭 → WorkspaceView Web 패널 열기 신호
+  const [webOpenRequest, setWebOpenRequest] = useState<{ url: string; ts: number } | null>(null);
+  // 세션별 알림 뱃지 카운트
+  const [sessionNotifications, setSessionNotifications] = useState<Record<string, number>>({});
+  // 세션별 마지막 알림 판단에 사용한 버퍼 내용 (중복 알림 방지)
+  const sessionLastNotifiedBufferRef = useRef<Record<string, string>>({});
+  // WorkspaceView refs (명령 전달용)
+  const workspaceRefsRef = useRef<Record<string, WorkspaceViewRef>>({});
+  // 세션 목록 변경 시 localStorage에 저장 (disconnected 플래그 제외)
+  useEffect(() => {
+    const toSave = sessions.map(({ disconnected: _, ...rest }) => rest);
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(toSave));
+  }, [sessions]);
 
-  const openSession = (conn: ConnectionInfo) => {
-    // 이미 열린 세션이면 전환만
-    const existing = sessions.find((s) => s.connectionId === conn.id);
-    if (existing) {
-      setCurrentConnectionId(conn.id);
-      return;
+  // 현재 세션 ID 변경 시 localStorage에 저장 + 이전 세션의 파일/로그 요청 초기화
+  useEffect(() => {
+    if (currentSessionId !== null) {
+      localStorage.setItem(CURRENT_SESSION_KEY, JSON.stringify(currentSessionId));
+    } else {
+      localStorage.removeItem(CURRENT_SESSION_KEY);
     }
+    // 세션 전환 시 이전 세션의 파일 열기/로그 요청이 새 세션에 전파되지 않도록 초기화
+    setFileOpenRequest(null);
+    setTailLogRequest(null);
+  }, [currentSessionId]);
 
+  // 복원된 세션 중 DB에 없는 연결은 제거 (connections 로드 후)
+  useEffect(() => {
+    if (connections.length === 0) return;
+    setSessions((prev) => {
+      const valid = prev.filter((s) => connections.some((c) => c.id === s.connectionId));
+      if (valid.length !== prev.length) {
+        // 현재 세션도 유효성 검사
+        if (currentSessionId && !valid.some((s) => s.sessionId === currentSessionId)) {
+          setCurrentSessionId(valid[0]?.sessionId ?? null);
+        }
+        return valid;
+      }
+      return prev;
+    });
+  }, [connections]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 새 세션 열기 (같은 서버 + 같은 디렉토리여도 항상 새 세션 생성)
+  const openSession = useCallback((conn: ConnectionInfo) => {
+    const sessionId = generateSessionId(conn.id);
     const session: Session = {
+      sessionId,
       connectionId: conn.id,
       name: conn.name,
       host: `${conn.username}@${conn.host}:${conn.port}`,
       workingDir: conn.last_working_dir || "~",
+      serviceUrl: conn.service_url || undefined,
     };
     setSessions((prev) => [...prev, session]);
-    setCurrentConnectionId(conn.id);
-  };
+    setCurrentSessionId(sessionId);
+  }, []);
 
   const handleCreateAndConnect = async (data: ConnectionCreate) => {
     let conn: ConnectionInfo;
@@ -51,6 +152,30 @@ function App() {
       conn = await createConnection(data);
     }
     openSession(conn);
+  };
+
+  // 세션 연결 상태 변경 핸들러
+  const handleSessionStatusChange = (sessionId: string, disconnected: boolean) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.sessionId === sessionId ? { ...s, disconnected } : s))
+    );
+  };
+
+  // 끊어진 세션 재연결
+  const handleReconnectSession = (sessionId: string) => {
+    setReconnectSignals((prev) => ({ ...prev, [sessionId]: (prev[sessionId] || 0) + 1 }));
+    setCurrentSessionId(sessionId);
+  };
+
+  // 세션 닫기
+  const handleCloseSession = (sessionId: string) => {
+    setSessions((prev) => {
+      const remaining = prev.filter((s) => s.sessionId !== sessionId);
+      if (currentSessionId === sessionId) {
+        setCurrentSessionId(remaining[0]?.sessionId ?? null);
+      }
+      return remaining;
+    });
   };
 
   // 서버 편집 모달용 상태
@@ -70,38 +195,103 @@ function App() {
     }
   };
 
-  return (
-    <div className="h-screen w-screen bg-[#1e1e2e] flex overflow-hidden">
-      {/* 좌측 사이드바 */}
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        activeSessions={sessions}
-        savedConnections={connections}
-        currentConnectionId={currentConnectionId}
-        onSelectSession={(connId) => setCurrentConnectionId(connId)}
-        onConnectSaved={(conn) => openSession(conn)}
-        onEditConnection={(conn) => setEditingConnection(conn)}
-        onAddConnection={() => setShowModal(true)}
-        onDeleteConnection={(id) => deleteConnection(id)}
-        onOpenSettings={() => setShowSettings(true)}
-      />
+  const handleSaveAsNewAndConnect = async (data: ConnectionCreate) => {
+    const conn = await createConnection(data);
+    openSession(conn);
+  };
 
-      {/* 메인 워크스페이스 — 세션별로 유지, 활성 세션만 표시 */}
-      {/* visibility로 숨김 (display:none은 PanelGroup 크기 계산을 깨뜨림) */}
-      <div className="flex-1 relative overflow-hidden">
+
+
+  // 현재 활성 세션 정보
+  const currentSession = sessions.find((s) => s.sessionId === currentSessionId) ?? null;
+
+  return (
+    <div className="h-screen w-screen bg-[#09090b] flex flex-col overflow-hidden">
+      <PanelGroup direction="horizontal" className="flex-1 overflow-hidden">
+        {/* 좌측 사이드바 Panel */}
+        <Panel
+          ref={sidebarPanelRef}
+          defaultSize={loadSidebarSize()}
+          minSize={8}
+          maxSize={35}
+          collapsible={true}
+          collapsedSize={2.5}
+          onCollapse={() => setSidebarCollapsed(true)}
+          onExpand={() => setSidebarCollapsed(false)}
+          onResize={(size) => {
+            if (size > 3) {
+              localStorage.setItem(SIDEBAR_SIZE_KEY, JSON.stringify(size));
+            }
+          }}
+        >
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => {
+            if (sidebarCollapsed) {
+              sidebarPanelRef.current?.expand();
+            } else {
+              sidebarPanelRef.current?.collapse();
+            }
+          }}
+          activeSessions={sessions}
+          savedConnections={connections}
+          currentSessionId={currentSessionId}
+          terminalPreviews={terminalPreviews}
+          sessionNotifications={sessionNotifications}
+          onSelectSession={(sid) => {
+            setCurrentSessionId(sid);
+            // 알림 뱃지 초기화
+            setSessionNotifications((prev) => ({ ...prev, [sid]: 0 }));
+          }}
+          onReconnectSession={handleReconnectSession}
+          onCloseSession={handleCloseSession}
+          onConnectSaved={(conn) => openSession(conn)}
+          onEditConnection={(conn) => setEditingConnection(conn)}
+          onAddConnection={() => setShowModal(true)}
+          onDeleteConnection={(id) => deleteConnection(id)}
+          onOpenSettings={() => setShowSettings(true)}
+          onFileSelect={(path, filename) => setFileOpenRequest({ path, filename, ts: Date.now() })}
+          onTailLog={(path) => setTailLogRequest({ path, ts: Date.now() })}
+          onTransferStatus={setTransferStatus}
+          fileTreeOpenSignal={fileTreeOpenSignal}
+          onWebOpen={(url) => setWebOpenRequest({ url, ts: Date.now() })}
+
+          onSendCommand={(terminalId, command) => {
+            console.log(`[Sidebar] Sending command to terminal: ${terminalId} - ${command}`);
+            if (currentSession) {
+              const wsRef = workspaceRefsRef.current[currentSession.sessionId];
+              console.log(`[Sidebar] Found workspace ref:`, !!wsRef);
+              if (wsRef) {
+                console.log(`[Sidebar] Calling sendCommandToTerminal`);
+                wsRef.sendCommandToTerminal(terminalId, command);
+              } else {
+                console.log(`[Sidebar] No workspace ref found for session ${currentSession.sessionId}`);
+              }
+            } else {
+              console.log(`[Sidebar] No current session`);
+            }
+          }}
+        />
+        </Panel>
+
+        {/* 사이드바-메인 리사이즈 핸들 */}
+        <PanelResizeHandle className="w-0.5 bg-[#3f3f46] hover:bg-[#3b82f6] cursor-col-resize transition-colors shrink-0" />
+
+      {/* 메인 워크스페이스 Panel — 세션별로 유지, 활성 세션만 표시 */}
+      <Panel>
+      <div className="relative h-full overflow-hidden">
         {sessions.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-[#585b70]">
-            <h1 className="text-2xl font-bold text-[#cdd6f4] mb-1">IvansTerm</h1>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-[#52525b]">
+            <h1 className="text-2xl font-bold text-[#f4f4f5] mb-1">IvansTerm</h1>
             <p className="text-sm mb-6">Multi-Pane Remote Dev-Suite</p>
             <p className="text-xs">Select a server from the sidebar to connect</p>
           </div>
         )}
         {sessions.map((s) => {
-          const isActive = s.connectionId === currentConnectionId;
+          const isActive = s.sessionId === currentSessionId;
           return (
             <div
-              key={s.connectionId}
+              key={s.sessionId}
               className="absolute inset-0 flex"
               style={{
                 visibility: isActive ? "visible" : "hidden",
@@ -109,15 +299,62 @@ function App() {
               }}
             >
               <WorkspaceView
+                ref={(ref) => {
+                  if (ref) {
+                    workspaceRefsRef.current[s.sessionId] = ref;
+                  }
+                }}
+                sessionId={s.sessionId}
                 connectionId={s.connectionId}
                 connectionName={s.name}
                 workingDir={s.workingDir}
+                initialWebUrl={s.serviceUrl}
                 terminalSettings={terminalSettings}
+                editorSettings={editorSettings}
+                onSessionStatusChange={(d) => handleSessionStatusChange(s.sessionId, d)}
+                reconnectSignal={reconnectSignals[s.sessionId] || 0}
+                onTerminalPreview={(lines) => {
+                  setTerminalPreviews((prev) => ({ ...prev, [s.sessionId]: lines }));
+
+                  // Claude 완료 패턴 감지: 현재 활성 세션 제외, 새로 나타난 패턴만 1회 감지
+                  if (s.sessionId !== currentSessionId) {
+                    const currentContent = lines.join("\n");
+                    const lastContent = sessionLastNotifiedBufferRef.current[s.sessionId] || "";
+                    const hasPattern = /✓|completed|완료/.test(currentContent);
+                    const hadPattern = /✓|completed|완료/.test(lastContent);
+                    if (hasPattern && !hadPattern) {
+                      setSessionNotifications((prev) => ({
+                        ...prev,
+                        [s.sessionId]: (prev[s.sessionId] || 0) + 1,
+                      }));
+                    }
+                    if (currentContent !== lastContent) {
+                      sessionLastNotifiedBufferRef.current[s.sessionId] = currentContent;
+                    }
+                  }
+
+                }}
+                fileOpenRequest={s.sessionId === currentSessionId ? fileOpenRequest : null}
+                tailLogRequest={s.sessionId === currentSessionId ? tailLogRequest : null}
+                onOpenFileTree={() => setFileTreeOpenSignal((n) => n + 1)}
+                webOpenRequest={s.sessionId === currentSessionId ? webOpenRequest : null}
+                autoFocus={s.sessionId === currentSessionId}
               />
             </div>
           );
         })}
       </div>
+      </Panel>
+      </PanelGroup>
+
+      {/* 하단 상태 바 */}
+      <StatusBar
+        currentConnectionId={currentSession?.connectionId ?? null}
+        currentSessionName={currentSession?.name ?? null}
+        currentSessionHost={currentSession?.host ?? null}
+        currentSessionDisconnected={currentSession?.disconnected ?? false}
+        transferStatus={transferStatus}
+      />
 
       {showModal && (
         <ConnectionModal onSubmit={handleCreateAndConnect} onClose={() => setShowModal(false)} />
@@ -126,14 +363,18 @@ function App() {
         <ConnectionModal
           initialData={editingConnection}
           onSubmit={handleEditAndConnect}
+          onSaveAsNew={handleSaveAsNewAndConnect}
           onClose={() => setEditingConnection(null)}
         />
       )}
       {showSettings && (
         <SettingsModal
-          settings={terminalSettings}
-          onUpdate={updateSettings}
-          onReset={resetSettings}
+          terminalSettings={terminalSettings}
+          editorSettings={editorSettings}
+          onUpdateTerminal={updateSettings}
+          onUpdateEditor={updateEditorSettings}
+          onResetTerminal={resetSettings}
+          onResetEditor={resetEditorSettings}
           onClose={() => setShowSettings(false)}
         />
       )}
