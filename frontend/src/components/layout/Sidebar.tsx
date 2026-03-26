@@ -32,11 +32,113 @@ interface SidebarProps {
   onTailLog?: (path: string) => void;
   onTransferStatus?: (status: TransferStatus | null) => void;
   fileTreeOpenSignal?: number;
-  onWebOpen?: (url: string) => void;
   onSendCommand?: (terminalId: string, command: string) => void;
 }
 
 type TabType = "sessions" | "servers";
+
+// 단축키 모달
+function ShortcutsModal({ onClose }: { onClose: () => void }) {
+  const sections = [
+    {
+      title: "터미널 (Terminal)",
+      shortcuts: [
+        { keys: ["Ctrl+Shift+C"], desc: "복사 (Copy)" },
+        { keys: ["Ctrl+Shift+V"], desc: "붙여넣기 (Paste)" },
+        { keys: ["Shift+드래그"], desc: "텍스트 선택 후 자동 복사" },
+        { keys: ["우클릭"], desc: "컨텍스트 메뉴 (붙여넣기)" },
+        { keys: ["Ctrl+L"], desc: "화면 지우기 (Clear)" },
+        { keys: ["Ctrl+C"], desc: "실행 중 프로세스 종료" },
+        { keys: ["Ctrl+Z"], desc: "백그라운드로 보내기 (Suspend)" },
+        { keys: ["Ctrl+D"], desc: "EOF / 세션 종료" },
+        { keys: ["Ctrl+A"], desc: "커서를 줄 처음으로" },
+        { keys: ["Ctrl+E"], desc: "커서를 줄 끝으로" },
+      ],
+    },
+    {
+      title: "에디터 (Monaco Editor)",
+      shortcuts: [
+        { keys: ["Ctrl+S"], desc: "파일 저장" },
+        { keys: ["Ctrl+F"], desc: "찾기 (Find)" },
+        { keys: ["Ctrl+H"], desc: "찾기/바꾸기 (Replace)" },
+        { keys: ["Ctrl+G"], desc: "특정 줄로 이동" },
+        { keys: ["Ctrl+Z"], desc: "실행 취소 (Undo)" },
+        { keys: ["Ctrl+Shift+Z"], desc: "다시 실행 (Redo)" },
+        { keys: ["Shift+Alt+F"], desc: "코드 포맷" },
+        { keys: ["Alt+↑/↓"], desc: "줄 이동" },
+        { keys: ["Ctrl+/"], desc: "주석 토글" },
+        { keys: ["Ctrl+D"], desc: "단어 선택 / 다중 커서" },
+      ],
+    },
+    {
+      title: "패널 / 앱 (Panel)",
+      shortcuts: [
+        { keys: ["Ctrl+클릭"], desc: "새 터미널 패널 추가" },
+        { keys: ["드래그"], desc: "패널 크기 조절" },
+      ],
+    },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#1c1c1f] border border-[#3f3f46] rounded-lg shadow-2xl w-[400px] max-h-[80vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#3f3f46] shrink-0">
+          <span className="text-sm font-semibold text-[#f4f4f5]">⌨️ 단축키 안내</span>
+          <button
+            onClick={onClose}
+            className="text-[#71717a] hover:text-[#f4f4f5] transition-colors text-lg leading-none"
+          >
+            ×
+          </button>
+        </div>
+        {/* 내용 */}
+        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-4">
+          {sections.map((sec) => (
+            <div key={sec.title}>
+              <div className="text-[11px] font-semibold text-[#3b82f6] uppercase tracking-wider mb-2">
+                {sec.title}
+              </div>
+              <table className="w-full text-xs">
+                <tbody>
+                  {sec.shortcuts.map((s) => (
+                    <tr key={s.desc} className="border-b border-[#27272a] last:border-0">
+                      <td className="py-1.5 pr-3 whitespace-nowrap">
+                        {s.keys.map((k) => (
+                          <kbd
+                            key={k}
+                            className="inline-block px-1.5 py-0.5 mr-1 bg-[#27272a] border border-[#52525b] rounded text-[10px] text-[#e4e4e7] font-mono"
+                          >
+                            {k}
+                          </kbd>
+                        ))}
+                      </td>
+                      <td className="py-1.5 text-[#a1a1aa]">{s.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+        <div className="px-4 py-2 border-t border-[#3f3f46] shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full py-1.5 text-xs bg-[#3f3f46] text-[#a1a1aa] rounded hover:bg-[#52525b] transition-colors"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // 세션 컨텍스트 헤더 (Files / Web Preview expander 공통)
 function SessionContextHeader({ session }: { session: ActiveSession }) {
@@ -69,7 +171,6 @@ export default function Sidebar({
   onTailLog,
   onTransferStatus,
   fileTreeOpenSignal,
-  onWebOpen,
   onSendCommand,
   sessionNotifications = {},
 }: SidebarProps) {
@@ -78,20 +179,26 @@ export default function Sidebar({
   const [webExpanded, setWebExpanded] = useState(false);
   const [claudeExpanded, setClaudeExpanded] = useState(false);
   const [claudeCommand, setClaudeCommand] = useState("");
-  const [webInputUrl, setWebInputUrl] = useState<string>(() => {
-    try { return localStorage.getItem("ivansterm_web_url") || ""; } catch { return ""; }
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // 세션별 Web Preview URL (키: sessionId)
+  const [webUrls, setWebUrls] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("ivansterm_web_urls") || "{}"); } catch { return {}; }
   });
 
   const currentSession = activeSessions.find((s) => s.sessionId === currentSessionId);
+  const webInputUrl = currentSessionId ? (webUrls[currentSessionId] ?? "") : "";
   const sftp = useSFTP(currentSession?.connectionId ?? 0);
 
   const handleWebOpen = () => {
+    if (!currentSessionId) return;
     let url = webInputUrl.trim();
     if (!url) return;
     if (!url.startsWith("http://") && !url.startsWith("https://")) url = "http://" + url;
-    setWebInputUrl(url);
-    try { localStorage.setItem("ivansterm_web_url", url); } catch { /* ignore */ }
-    onWebOpen?.(url);
+    const updated = { ...webUrls, [currentSessionId]: url };
+    setWebUrls(updated);
+    try { localStorage.setItem("ivansterm_web_urls", JSON.stringify(updated)); } catch { /* ignore */ }
+    // iframe 대신 새 창으로 열기 (스트리밍 성능 개선)
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // 세션이 새로 추가되면 자동으로 Sessions 탭으로 전환
@@ -145,6 +252,7 @@ export default function Sidebar({
 
   return (
     <div className="w-full h-full bg-[#18181b] flex flex-col overflow-hidden">
+      {shortcutsOpen && <ShortcutsModal onClose={() => setShortcutsOpen(false)} />}
       {/* 헤더 */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#3f3f46]">
         <span className="text-[#3b82f6] font-bold text-sm">IvansTerm</span>
@@ -264,6 +372,17 @@ export default function Sidebar({
               })}
             </div>
 
+            {/* 단축키 안내 버튼 */}
+            <div className="border-t border-[#3f3f46] shrink-0">
+              <button
+                onClick={() => setShortcutsOpen(true)}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] text-[#fbbf24] hover:text-[#fde68a] hover:bg-[#3f3f46]/50 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"/></svg>
+                단축키 안내!
+              </button>
+            </div>
+
             {/* Files expander */}
             <div className="border-t border-[#3f3f46] shrink-0">
               <button
@@ -320,7 +439,12 @@ export default function Sidebar({
                     <input
                       type="text"
                       value={webInputUrl}
-                      onChange={(e) => setWebInputUrl(e.target.value)}
+                      onChange={(e) => {
+                        if (!currentSessionId) return;
+                        const updated = { ...webUrls, [currentSessionId]: e.target.value };
+                        setWebUrls(updated);
+                        try { localStorage.setItem("ivansterm_web_urls", JSON.stringify(updated)); } catch { /* ignore */ }
+                      }}
                       onKeyDown={(e) => { if (e.key === "Enter") handleWebOpen(); }}
                       placeholder="http://localhost:3000"
                       className="w-full px-2 py-1.5 text-xs bg-[#27272a] border border-[#3f3f46] rounded text-[#f4f4f5] placeholder-[#52525b] focus:outline-none focus:border-[#3b82f6]"

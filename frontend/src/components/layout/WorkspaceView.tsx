@@ -29,7 +29,6 @@ interface WorkspaceViewProps {
   fileOpenRequest?: FileOpenRequest | null;
   tailLogRequest?: TailLogRequest | null;
   onOpenFileTree?: () => void;
-  webOpenRequest?: { url: string; ts: number } | null;
   autoFocus?: boolean;
 }
 
@@ -39,10 +38,11 @@ let terminalCounter = 1;
 // 터미널 명령 전달용 ref type
 export interface WorkspaceViewRef {
   sendCommandToTerminal: (terminalId: string, command: string) => void;
+  focusActiveTerminal: () => void;
 }
 
 const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
-  ({ sessionId, connectionId, connectionName: _name, workingDir, initialWebUrl, terminalSettings, editorSettings, onSessionStatusChange, reconnectSignal, onTerminalPreview, fileOpenRequest, tailLogRequest, onOpenFileTree, webOpenRequest, autoFocus }, ref) => {
+  ({ sessionId, connectionId, connectionName: _name, workingDir, initialWebUrl, terminalSettings, editorSettings, onSessionStatusChange, reconnectSignal, onTerminalPreview, fileOpenRequest, tailLogRequest, onOpenFileTree, autoFocus }, ref) => {
     void _name;
     const { loadLayout, saveLayout } = useWorkspace(sessionId);
     const [terminals, setTerminals] = useState<TerminalEntry[]>([
@@ -50,15 +50,18 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
     ]);
     const [termViewMode, setTermViewMode] = useState<TerminalViewMode>("tab");
     const [activeTermId, setActiveTermId] = useState<string>(`term_${connectionId}_${sessionId.slice(-8)}`);
+    const activeTermIdRef = useRef(activeTermId);
+    useEffect(() => { activeTermIdRef.current = activeTermId; }, [activeTermId]);
     const [layoutLoaded, setLayoutLoaded] = useState(false);
 
     // 터미널 refs (명령 전달용)
     const terminalRefsRef = useRef<Record<string, { write: (data: string) => void; focus: () => void }>>({});
+    // 새 터미널 추가 시 마운트 후 자동 포커스용 ID
+    const pendingFocusIdRef = useRef<string | null>(null);
 
   // Web 패널 상태
   const [webPanelVisible, setWebPanelVisible] = useState(false);
   const [webInputUrl, setWebInputUrl] = useState("");
-  const [webIframeUrl, setWebIframeUrl] = useState("");
 
     // 터미널별 연결 상태 추적
     const termStatusRef = useRef<Record<string, boolean>>({});
@@ -72,18 +75,15 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
     // 명령 전달 ref 구현
     useImperativeHandle(ref, () => ({
       sendCommandToTerminal: (terminalId: string, command: string) => {
-        console.log(`[WorkspaceView] sendCommandToTerminal called: ${terminalId} - ${command}`);
         const termRef = terminalRefsRef.current[terminalId];
-        console.log(`[WorkspaceView] Found terminal ref:`, !!termRef);
         if (termRef?.write) {
-          console.log(`[WorkspaceView] Writing to terminal: ${command}\r`);
           termRef.write(command + '\r');
-          // 명령 전달 후 터미널 자동 포커스
           setTimeout(() => termRef.focus?.(), 50);
-        } else {
-          console.log(`[WorkspaceView] No terminal ref found for ${terminalId}`);
-          console.log(`[WorkspaceView] Available terminals:`, Object.keys(terminalRefsRef.current));
         }
+      },
+      focusActiveTerminal: () => {
+        const id = activeTermIdRef.current;
+        setTimeout(() => terminalRefsRef.current[id]?.focus(), 100);
       },
     }), []);
 
@@ -106,7 +106,6 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
       // Web 패널 URL 복원
       if (layout.webPanelUrl) {
         setWebInputUrl(layout.webPanelUrl);
-        setWebIframeUrl(layout.webPanelUrl);
         setWebPanelVisible(layout.webPanelVisible ?? false);
       } else if (initialWebUrl) {
         // service_url 있으면 URL만 세팅 (자동 오픈 안 함 — 사용자가 직접 열도록)
@@ -117,26 +116,13 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
     });
   }, [loadLayout]);
 
-  // 사이드바 Web Open 요청 처리
-  const lastWebOpenTs = useRef(0);
-  useEffect(() => {
-    if (!webOpenRequest || webOpenRequest.ts <= lastWebOpenTs.current) return;
-    lastWebOpenTs.current = webOpenRequest.ts;
-    const url = webOpenRequest.url;
-    setWebInputUrl(url);
-    setWebIframeUrl(url);
-    setWebPanelVisible(true);
-    persistLayout({ webPanelUrl: url, webPanelVisible: true });
-  }, [webOpenRequest]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Web 패널 URL 이동 핸들러
+  // Web 패널 URL 이동 핸들러 (새 창으로 열기)
   const handleWebGo = useCallback(() => {
     let url = webInputUrl.trim();
     if (!url) return;
     if (!url.startsWith("http://") && !url.startsWith("https://")) url = "http://" + url;
     setWebInputUrl(url);
-    setWebIframeUrl(url);
-    persistLayout({ webPanelUrl: url, webPanelVisible: true });
+    window.open(url, '_blank', 'noopener,noreferrer');
   }, [webInputUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Web 패널 토글
@@ -144,6 +130,10 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
     setWebPanelVisible((v) => {
       const next = !v;
       persistLayout({ webPanelVisible: next });
+      // 패널 닫힐 때 터미널 자동 포커스
+      if (!next) {
+        setTimeout(() => terminalRefsRef.current[activeTermIdRef.current]?.focus(), 100);
+      }
       return next;
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -152,22 +142,30 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
     if (terminals.length >= 3) return;
     terminalCounter += 1;
     const id = `term_${connectionId}_${Date.now()}`;
+    pendingFocusIdRef.current = id; // 마운트 후 포커스 대상으로 등록
     setTerminals((prev) => [...prev, { id, label: `Terminal ${terminalCounter}` }]);
     setActiveTermId(id);
   };
 
+  // 탭 클릭 시 해당 터미널로 포커스
+  const handleSelectTerm = (id: string) => {
+    setActiveTermId(id);
+    setTimeout(() => terminalRefsRef.current[id]?.focus(), 50);
+  };
+
   const closeTerminal = useCallback((id: string) => {
-    // ref에서 상태 정리
     delete termStatusRef.current[id];
     setTerminals((prev) => {
       if (prev.length <= 1) return prev;
       const newTerms = prev.filter((t) => t.id !== id);
       if (id === activeTermId) {
-        setActiveTermId(newTerms[0]?.id ?? "");
+        const nextId = newTerms[0]?.id ?? "";
+        setActiveTermId(nextId);
+        // 닫힌 터미널이 활성이었으면 남은 터미널로 포커스
+        setTimeout(() => terminalRefsRef.current[nextId]?.focus(), 50);
       }
       return newTerms;
     });
-    // 남은 터미널 상태로 세션 상태 재계산
     const anyDisconnected = Object.values(termStatusRef.current).some((d) => d);
     onSessionStatusChange?.(anyDisconnected);
   }, [activeTermId, onSessionStatusChange]);
@@ -222,19 +220,19 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
               ×
             </button>
           </div>
-          {/* iframe */}
-          {webIframeUrl ? (
-            <iframe
-              src={webIframeUrl}
-              className="flex-1 w-full border-none bg-white"
-              title="Web Preview"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-[#52525b] text-xs">
-              URL 입력 후 Go 클릭
-            </div>
-          )}
+          {/* URL 입력 후 새 창으로 열림 안내 */}
+          <div className="flex-1 flex flex-col items-center justify-center text-[#52525b] text-xs gap-2">
+            <span>URL을 입력하고 Go를 클릭하면 새 탭에서 열립니다</span>
+            {webInputUrl && (
+              <button
+                onClick={handleWebGo}
+                className="text-[#3b82f6] hover:underline break-all max-w-xs text-center"
+                title={webInputUrl}
+              >
+                {webInputUrl}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -285,7 +283,7 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
                         ? "text-[#f4f4f5] bg-[#09090b]"
                         : "text-[#52525b] hover:text-[#a1a1aa]"
                     }`}
-                    onClick={() => setActiveTermId(t.id)}
+                    onClick={() => handleSelectTerm(t.id)}
                   >
                     <span>{t.label}</span>
                     {terminals.length > 1 && (
@@ -344,7 +342,10 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
                   key={t.id}
                   className="absolute inset-0 flex flex-col"
                   style={{
-                    display: isVisible ? "flex" : "none",
+                    // display:none 대신 visibility+pointerEvents 조합 사용:
+                    // display:none은 xterm 레이아웃 계산을 중단시켜 셀 크기 0 캐싱 유발
+                    visibility: isVisible ? "visible" : "hidden",
+                    pointerEvents: isVisible ? "auto" : "none",
                     // split 모드에서 상하 분할 위치
                     ...(termViewMode === "split" && idx < 2 ? {
                       position: "absolute",
@@ -371,11 +372,16 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
                   {termViewMode === "split" && idx === 1 && (
                     <div className="h-0.5 bg-[#3f3f46] shrink-0" />
                   )}
-                  <div className="flex-1 overflow-hidden">
+                  <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative">
                     <TerminalPanel
                       ref={(ref) => {
                         if (ref) {
                           terminalRefsRef.current[t.id] = ref;
+                          // 새 터미널 추가 시 pendingFocus 처리
+                          if (pendingFocusIdRef.current === t.id) {
+                            pendingFocusIdRef.current = null;
+                            setTimeout(() => ref.focus(), 300);
+                          }
                         }
                       }}
                       connectionId={connectionId}

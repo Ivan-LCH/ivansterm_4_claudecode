@@ -62,7 +62,9 @@ class SSHManager:
                 check=False,
             )
             is_new_tmux = check.exit_status != 0  # 0=기존 존재, 비0=신규
-            command = f"tmux new-session -A -s {tmux_session} || bash"
+            # \; 는 bash에서 리터럴 ;로 tmux에 전달 → tmux 내부 명령 구분자로 동작
+            # set-option -g mouse on: 마우스 스크롤 지원 (tmux copy mode 진입)
+            command = f"tmux new-session -A -s {tmux_session} \\; set-option -g mouse on || bash"
         else:
             command = None
 

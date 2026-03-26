@@ -13,6 +13,7 @@ export interface FileOpenRequest {
   path: string;
   filename: string;
   ts: number; // 변경 감지용 타임스탬프
+  silent?: boolean; // true: 파일 없으면 조용히 무시 (기본 파일 자동 오픈용)
 }
 
 export interface TailLogRequest {
@@ -176,9 +177,9 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
     return () => window.removeEventListener("focus", onFocus);
   }, [tabs, checkFileChanges]);
 
-  // 파일 열기
+  // 파일 열기 (silent=true: 파일 없을 시 에러 없이 무시)
   const openFile = useCallback(
-    async (path: string, filename: string) => {
+    async (path: string, filename: string, silent = false) => {
       const existing = tabs.find((t) => t.path === path);
       if (existing) {
         setActiveTabId(existing.id);
@@ -198,7 +199,9 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
         setTabs((prev) => [...prev, tab]);
         setActiveTabId(tab.id);
       } catch (e) {
-        alert(`Failed to open file: ${e instanceof Error ? e.message : String(e)}`);
+        if (!silent) {
+          alert(`Failed to open file: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
     },
     [tabs, sftp]
@@ -472,7 +475,7 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
   useEffect(() => {
     if (!fileOpenRequest || fileOpenRequest.ts <= lastFileOpenTs.current) return;
     lastFileOpenTs.current = fileOpenRequest.ts;
-    openFile(fileOpenRequest.path, fileOpenRequest.filename);
+    openFile(fileOpenRequest.path, fileOpenRequest.filename, fileOpenRequest.silent);
   }, [fileOpenRequest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 외부 Tail Log 요청 감지

@@ -80,13 +80,11 @@ function App() {
   const [transferStatus, setTransferStatus] = useState<TransferStatus | null>(null);
   // 세션별 터미널 프리뷰 (사이드바 미니 터미널용)
   const [terminalPreviews, setTerminalPreviews] = useState<Record<string, string[]>>({});
-  // 사이드바 FileTree → EditorPanel 파일 열기/로그 요청
-  const [fileOpenRequest, setFileOpenRequest] = useState<FileOpenRequest | null>(null);
-  const [tailLogRequest, setTailLogRequest] = useState<TailLogRequest | null>(null);
+  // 사이드바 FileTree → EditorPanel 파일 열기/로그 요청 (세션별 격리)
+  const [fileOpenRequests, setFileOpenRequests] = useState<Record<string, FileOpenRequest | null>>({});
+  const [tailLogRequests, setTailLogRequests] = useState<Record<string, TailLogRequest | null>>({});
   // EditorPanel "Files" 버튼 → Sidebar Files 탭 열기 신호
   const [fileTreeOpenSignal, setFileTreeOpenSignal] = useState(0);
-  // Sidebar Web 탭 → WorkspaceView Web 패널 열기 신호
-  const [webOpenRequest, setWebOpenRequest] = useState<{ url: string; ts: number } | null>(null);
   // 세션별 알림 뱃지 카운트
   const [sessionNotifications, setSessionNotifications] = useState<Record<string, number>>({});
   // 세션별 마지막 알림 판단에 사용한 버퍼 내용 (중복 알림 방지)
@@ -106,9 +104,7 @@ function App() {
     } else {
       localStorage.removeItem(CURRENT_SESSION_KEY);
     }
-    // 세션 전환 시 이전 세션의 파일 열기/로그 요청이 새 세션에 전파되지 않도록 초기화
-    setFileOpenRequest(null);
-    setTailLogRequest(null);
+    // 세션별 격리로 관리되므로 별도 초기화 불필요
   }, [currentSessionId]);
 
   // 복원된 세션 중 DB에 없는 연결은 제거 (connections 로드 후)
@@ -140,6 +136,20 @@ function App() {
     };
     setSessions((prev) => [...prev, session]);
     setCurrentSessionId(sessionId);
+
+    // 새 세션 기본 파일/로그 자동 오픈: TO-DO-LIST.md (에디터), logs/server.log (로그뷰어)
+    // 파일이 없으면 silent:true로 조용히 무시 → 빈 패널 표시
+    const wd = conn.last_working_dir || "~";
+    const sep = wd.endsWith("/") ? "" : "/";
+    const ts = Date.now();
+    setFileOpenRequests((prev) => ({
+      ...prev,
+      [sessionId]: { path: `${wd}${sep}TO-DO-LIST.md`, filename: "TO-DO-LIST.md", ts, silent: true },
+    }));
+    setTailLogRequests((prev) => ({
+      ...prev,
+      [sessionId]: { path: `${wd}${sep}logs/server.log`, ts },
+    }));
   }, []);
 
   const handleCreateAndConnect = async (data: ConnectionCreate) => {
@@ -240,8 +250,9 @@ function App() {
           sessionNotifications={sessionNotifications}
           onSelectSession={(sid) => {
             setCurrentSessionId(sid);
-            // 알림 뱃지 초기화
             setSessionNotifications((prev) => ({ ...prev, [sid]: 0 }));
+            // 세션 전환 시 해당 세션 터미널 자동 포커스
+            setTimeout(() => workspaceRefsRef.current[sid]?.focusActiveTerminal(), 50);
           }}
           onReconnectSession={handleReconnectSession}
           onCloseSession={handleCloseSession}
@@ -250,11 +261,14 @@ function App() {
           onAddConnection={() => setShowModal(true)}
           onDeleteConnection={(id) => deleteConnection(id)}
           onOpenSettings={() => setShowSettings(true)}
-          onFileSelect={(path, filename) => setFileOpenRequest({ path, filename, ts: Date.now() })}
-          onTailLog={(path) => setTailLogRequest({ path, ts: Date.now() })}
+          onFileSelect={(path, filename) => {
+            if (currentSessionId) setFileOpenRequests((prev) => ({ ...prev, [currentSessionId]: { path, filename, ts: Date.now() } }));
+          }}
+          onTailLog={(path) => {
+            if (currentSessionId) setTailLogRequests((prev) => ({ ...prev, [currentSessionId]: { path, ts: Date.now() } }));
+          }}
           onTransferStatus={setTransferStatus}
           fileTreeOpenSignal={fileTreeOpenSignal}
-          onWebOpen={(url) => setWebOpenRequest({ url, ts: Date.now() })}
 
           onSendCommand={(terminalId, command) => {
             console.log(`[Sidebar] Sending command to terminal: ${terminalId} - ${command}`);
@@ -334,10 +348,9 @@ function App() {
                   }
 
                 }}
-                fileOpenRequest={s.sessionId === currentSessionId ? fileOpenRequest : null}
-                tailLogRequest={s.sessionId === currentSessionId ? tailLogRequest : null}
+                fileOpenRequest={fileOpenRequests[s.sessionId] ?? null}
+                tailLogRequest={tailLogRequests[s.sessionId] ?? null}
                 onOpenFileTree={() => setFileTreeOpenSignal((n) => n + 1)}
-                webOpenRequest={s.sessionId === currentSessionId ? webOpenRequest : null}
                 autoFocus={s.sessionId === currentSessionId}
               />
             </div>

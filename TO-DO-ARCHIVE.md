@@ -13,6 +13,14 @@
   - [C] 1-4a. SSH exit 시 해당 터미널 패널 자동 제거 및 남은 패널 공간 재분배
   - [C] 1-4b. 터미널 마우스 복사(좌클릭 드래그)/붙여넣기(우클릭) 지원
         > HTTPS(자체 서명 인증서) 전환으로 Clipboard API 활성화
+  - [C] 1-1 (재작업). 터미널 스크롤바 동기화 버그 수정 (2026-03-26)
+        > tmux copy-mode [N/M] 인디케이터 파싱으로 가상 추정 로직 대체
+  - [C] 1-2 (재작업). Copy 불가 버그 수정 (2026-03-26)
+        > keyup/mouseup을 capture phase로 변경 + pendingSelectionText 저장 방식
+        > Shift+드래그 → Shift 릴리즈 시 자동 복사 동작
+  - [S] 1-2b. 터미널 마우스 Copy & Paste UX 개선 (보류)
+        > 일반 드래그 복사: tmux mouse on 충돌로 Shift+드래그로 대체
+        > 잔여: Ctrl+Shift+C 복사 단축키 — 필요 시 재개
 
 
 ──────────────────────────────────────────────────────────────────────────────
@@ -432,3 +440,50 @@
         - ssh_manager: tmux has-session으로 신규/기존 세션 판별, SSHSession.is_new_tmux 플래그 추가
         - terminal.py: is_new_tmux=True일 때만 cd 전송, attach 시 미전송
         - Claude 실행 중 리프레시해도 cd 명령 날아가지 않음
+
+──────────────────────────────────────────────────────────────────────────────
+[2026-03-25] Phase 5. 🔌 접속 및 세션 관리 (Connection & Session) — 버그픽스
+──────────────────────────────────────────────────────────────────────────────
+
+  - [C] 5-1. Web Preview URL 세션별 분리
+        - URL 저장: localStorage를 Record<sessionId, url>로 세션별 관리
+        - Open 시 다른 세션 전파 버그 픽스: webOpenRequest에 sessionId 포함,
+          WorkspaceView에서 자신의 sessionId와 불일치 시 무시하도록 수정
+
+──────────────────────────────────────────────────────────────────────────────
+[2026-03-26] Phase 1. 🖥️ SSH 터미널 (Terminal) — 버그픽스/기능개선
+──────────────────────────────────────────────────────────────────────────────
+
+  - [C] 1-3. 새 터미널 추가 시 자동 포커스(Auto-focus) 누락 수정
+        - + 버튼: pendingFocusIdRef에 새 터미널 ID 등록 → ref 콜백에서 마운트 감지 → 300ms 후 focus()
+        - 탭 클릭: handleSelectTerm() → setActiveTermId + 50ms 후 focus()
+
+  - [C] 1-4. 오토포커스 누락 시나리오 일괄 수정
+        - 세션 전환 시: 사이드바 세션 클릭 → 해당 세션 활성 터미널 포커스
+        - 터미널 탭 닫기: 활성 탭 닫히면 남은 터미널 자동 포커스
+        - Web 패널 닫기: × 클릭 후 터미널 복귀 시 자동 포커스
+        - 재연결 후: SSH 재연결 성공 시 터미널 자동 포커스
+
+  - [C] 1-5. 새 세션 연결 시 기본 파일 자동 오픈
+        - 연결 성공 후 Editor에 TO-DO-LIST.md, LogViewer에 logs/server.log 자동 표시
+        - 파일 없으면 silent:true → alert 없이 빈 패널 표시
+        - App.tsx openSession() 에서 FileOpenRequest(silent:true) + TailLogRequest 세션별 설정
+        - EditorPanel openFile(): silent 파라미터 추가
+
+──────────────────────────────────────────────────────────────────────────────
+[2026-03-26] Phase 2. 📝 리모트 파일 에디터 (Editor) — 버그픽스
+──────────────────────────────────────────────────────────────────────────────
+
+  - [C] 2-1. 에디터 파일 열기 시 타 세션 오염(Cross-session) 버그 수정
+        - 원인: fileOpenRequest / tailLogRequest가 전역 단일 상태 → 타 세션 EditorPanel도 수신
+        - 수정: Record<sessionId, Request> 세션별 Map으로 변경
+        - Sidebar 콜백: currentSessionId 키로 해당 세션에만 요청 저장
+
+──────────────────────────────────────────────────────────────────────────────
+[2026-03-26] Phase 6. 🎨 UI 고도화 (UI/UX Enhancement) — 개선
+──────────────────────────────────────────────────────────────────────────────
+
+  - [C] 6-1. Web Preview 프레임 내 스트리밍 지연 이슈 → 새 창으로 전략 변경
+        - 원인: iframe = 별도 브라우저 컨텍스트 → CPU/GPU/이벤트루프 경쟁 → LLM 스트리밍 속도 저하
+        - 수정: 모든 URL 열기를 window.open 새 탭으로 전환
+        - WorkspaceView: iframe 제거, URL 입력바 + "새 탭에서 열립니다" 안내로 교체
