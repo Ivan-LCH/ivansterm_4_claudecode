@@ -2,6 +2,9 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor as monacoEditor } from "monaco-editor";
+// @ts-ignore
+import Viewer from "@toast-ui/editor/viewer";
+import "@toast-ui/editor/dist/toastui-editor-viewer.css";
 import LogViewer from "./LogViewer";
 import { useSFTP } from "../../hooks/useSFTP";
 import type { EditorTab, EditorSettings, TerminalTheme } from "../../types";
@@ -54,7 +57,13 @@ function getLanguage(filename: string): string {
   return map[ext] || "plaintext";
 }
 
-export default function EditorPanel({ connectionId, workingDir: _workingDir, initialLayout, onLayoutChange, editorSettings, terminalTheme, fileOpenRequest, tailLogRequest, onOpenFileTree }: EditorPanelProps) {
+// Markdown 파일 여부 확인
+function isMarkdown(filename: string): boolean {
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+  return ext === "md";
+}
+
+export default function EditorPanel({ connectionId, workingDir: _workingDir, initialLayout, onLayoutChange, editorSettings, terminalTheme, fileOpenRequest, tailLogRequest, onOpenFileTree: _onOpenFileTree }: EditorPanelProps) {
   void _workingDir;
   const sftp = useSFTP(connectionId);
   const [tabs, setTabs] = useState<EditorTab[]>([]);
@@ -397,6 +406,17 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
     }
   }, [editorSettings?.theme, editorSettings?.customColors]);
 
+  // Markdown 편집 모드 (false=뷰어, true=에디터)
+  const [mdEditMode, setMdEditMode] = useState(false);
+
+  // 활성 탭 변경 시 markdown 편집 모드 초기화
+  useEffect(() => {
+    setMdEditMode(false);
+  }, [activeTabId]);
+
+  // Toast UI Viewer 컨테이너 ref
+  const viewerRef = useRef<HTMLDivElement | null>(null);
+
   // 에디터 렌더링 헬퍼
   const renderEditor = (
     tab: EditorTab | null,
@@ -412,6 +432,33 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
             <p className="text-xs">{placeholder}</p>
           </div>
         </div>
+      );
+    }
+
+    // Markdown 파일이고 뷰어 모드인 경우 Toast UI Viewer 사용
+    if (isMarkdown(tab.filename) && !mdEditMode) {
+      return (
+        <div
+          ref={viewerRef}
+          className="h-full overflow-auto bg-[#f8f8f8] p-4
+            [&_.toastui-editor-contents]:bg-[#ffffff]
+            [&_.toastui-editor-contents]:text-[#1a1a1a]
+            [&_h1]:text-[#1a1a1a]
+            [&_h2]:text-[#1a1a1a]
+            [&_h3]:text-[#1a1a1a]
+            [&_h4]:text-[#1a1a1a]
+            [&_h5]:text-[#1a1a1a]
+            [&_h6]:text-[#1a1a1a]
+            [&_p]:text-[#1a1a1a]
+            [&_li]:text-[#1a1a1a]
+            [&_code]:bg-[#f0f0f0]
+            [&_code]:text-[#d73a49]
+            [&_pre]:bg-[#f6f8fa]
+            [&_pre]:text-[#1a1a1a]
+            [&_blockquote]:text-[#424242]
+            [&_a]:text-[#0969da]"
+          data-markdown-content={tab.content}
+        />
       );
     }
 
@@ -440,6 +487,20 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
       />
     );
   };
+
+  // Markdown Viewer 재생성 (뷰어 모드일 때만)
+  useEffect(() => {
+    if (!viewerRef.current || !activeTab || !isMarkdown(activeTab.filename) || mdEditMode) {
+      return;
+    }
+    viewerRef.current.innerHTML = '';
+    new Viewer({
+      el: viewerRef.current,
+      initialValue: activeTab.content,
+      height: '100%',
+    });
+  }, [activeTab?.id, activeTab?.content, mdEditMode]);
+
 
   // 에디터 뷰 모드 토글 + 레이아웃 저장
   const toggleViewMode = () => {
@@ -538,51 +599,83 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
         })}
 
         {/* 우측 컨트롤 */}
-        <div className="ml-auto flex items-center shrink-0">
+        <div className="ml-auto flex items-center gap-1 px-2 shrink-0">
+          {/* 상태 배지 */}
           {saveStatus !== "idle" && (
             <span
-              className={`px-2 text-[15px] ${
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${
                 saveStatus === "saving"
-                  ? "text-[#f59e0b]"
+                  ? "bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/30"
                   : saveStatus === "saved"
-                  ? "text-[#10b981]"
-                  : "text-[#ef4444]"
+                  ? "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30"
+                  : "bg-[#ef4444]/10 text-[#ef4444] border-[#ef4444]/30"
               }`}
             >
-              {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : "Save failed"}
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                saveStatus === "saving" ? "bg-[#f59e0b] animate-pulse"
+                : saveStatus === "saved" ? "bg-[#10b981]"
+                : "bg-[#ef4444]"
+              }`} />
+              {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : "Save failed"}
             </span>
           )}
 
+          {/* 구분선 */}
+          <div className="w-px h-4 bg-[#3f3f46] mx-1" />
+
+          {/* Split 버튼 */}
           {tabs.length >= 2 && (
             <button
               onClick={toggleViewMode}
-              className={`px-2 py-1 text-[15px] font-medium transition-colors ${
+              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
                 viewMode === "split"
-                  ? "text-[#3b82f6]"
-                  : "text-[#52525b] hover:text-[#a1a1aa]"
+                  ? "bg-[#3b82f6]/15 text-[#3b82f6] border-[#3b82f6]/40 hover:bg-[#3b82f6]/25"
+                  : "bg-[#27272a] text-[#a1a1aa] border-[#3f3f46] hover:text-[#f4f4f5] hover:border-[#52525b]"
               }`}
               title={viewMode === "split" ? "Single view" : "Split view"}
             >
-              {viewMode === "split" ? "⬒" : "⬜"}
+              <span className="text-[13px]">{viewMode === "split" ? "⬒" : "⬜"}</span>
+              Split
             </button>
           )}
 
+          {/* Edit / Preview 버튼 (Markdown 전용) */}
+          {activeTab && isMarkdown(activeTab.filename) && (
+            <button
+              onClick={() => setMdEditMode((v) => !v)}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
+                mdEditMode
+                  ? "bg-[#f59e0b]/15 text-[#f59e0b] border-[#f59e0b]/40 hover:bg-[#f59e0b]/25"
+                  : "bg-[#27272a] text-[#a1a1aa] border-[#3f3f46] hover:text-[#f4f4f5] hover:border-[#52525b]"
+              }`}
+              title={mdEditMode ? "Switch to Preview" : "Switch to Edit mode"}
+            >
+              <span className="text-[12px]">{mdEditMode ? "👁" : "✏"}</span>
+              {mdEditMode ? "Preview" : "Edit"}
+            </button>
+          )}
+
+          {/* Refresh 버튼 */}
           <button
-            onClick={onOpenFileTree}
-            className="px-2 py-1 text-[12px] text-[#52525b] hover:text-[#a1a1aa] transition-colors"
-            title="Open file tree"
+            onClick={() => checkFileChanges()}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border bg-[#27272a] text-[#a1a1aa] border-[#3f3f46] hover:text-[#f4f4f5] hover:border-[#52525b] transition-colors"
+            title="Reload file from server"
           >
-            Files
+            <span className="text-[13px]">↻</span>
+            Refresh
           </button>
+
+          {/* Log 버튼 */}
           <button
             onClick={toggleLog}
-            className={`px-2 py-1 text-[12px] transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
               logExpanded
-                ? "text-[#3b82f6]"
-                : "text-[#52525b] hover:text-[#a1a1aa]"
+                ? "bg-[#3b82f6]/15 text-[#3b82f6] border-[#3b82f6]/40 hover:bg-[#3b82f6]/25"
+                : "bg-[#27272a] text-[#a1a1aa] border-[#3f3f46] hover:text-[#f4f4f5] hover:border-[#52525b]"
             }`}
             title={logExpanded ? "Hide log viewer" : "Show log viewer"}
           >
+            <span className="text-[12px]">≡</span>
             Log
           </button>
         </div>

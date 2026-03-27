@@ -35,7 +35,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 6. Frontend 의존성 설치 (폐쇄망 대비)
 COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm install
+RUN cd frontend && npm install --legacy-peer-deps
 
 # 7. 엔트리포인트 설정
 COPY entrypoint.sh /entrypoint.sh

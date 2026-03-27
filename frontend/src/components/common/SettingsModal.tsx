@@ -11,6 +11,7 @@ interface SettingsModalProps {
   onResetTerminal: () => void;
   onResetEditor: () => void;
   onClose: () => void;
+  isMarkdownFile?: boolean;
 }
 
 type Section = "terminal" | "editor";
@@ -25,6 +26,7 @@ export default function SettingsModal({
   onResetTerminal,
   onResetEditor,
   onClose,
+  isMarkdownFile = false,
 }: SettingsModalProps) {
   const [section, setSection] = useState<Section>("terminal");
   const [termTab, setTermTab] = useState<TerminalTab>("theme");
@@ -324,24 +326,37 @@ export default function SettingsModal({
         {/* ── Editor 설정 ── */}
         {section === "editor" && (
           <>
-            {/* 서브 탭 */}
-            <div className="flex border-b border-[#3f3f46]">
-              {(["theme", "font", "options"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setEditorTab(tab)}
-                  className={`flex-1 py-2 text-[11px] text-center transition-colors ${
-                    editorTab === tab
-                      ? "text-[#f4f4f5] border-b-2 border-[#3b82f6]"
-                      : "text-[#52525b] hover:text-[#a1a1aa]"
-                  }`}
-                >
-                  {tab === "theme" ? "Theme" : tab === "font" ? "Font" : "Options"}
-                </button>
-              ))}
-            </div>
+            {isMarkdownFile ? (
+              <>
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <div className="text-center">
+                    <div className="text-4xl mb-3 opacity-40">📄</div>
+                    <p className="text-sm text-[#a1a1aa] mb-2">Markdown 파일</p>
+                    <p className="text-xs text-[#52525b]">이 파일은 기본 스타일로만 표시됩니다.</p>
+                    <p className="text-xs text-[#52525b]">설정이 적용되지 않습니다.</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* 서브 탭 */}
+                <div className="flex border-b border-[#3f3f46]">
+                  {(["theme", "font", "options"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setEditorTab(tab)}
+                      className={`flex-1 py-2 text-[11px] text-center transition-colors ${
+                        editorTab === tab
+                          ? "text-[#f4f4f5] border-b-2 border-[#3b82f6]"
+                          : "text-[#52525b] hover:text-[#a1a1aa]"
+                      }`}
+                    >
+                      {tab === "theme" ? "Theme" : tab === "font" ? "Font" : "Options"}
+                    </button>
+                  ))}
+                </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {editorTab === "theme" && (
                 <>
                   <label className="text-xs text-[#a1a1aa] block mb-2">Editor Theme</label>
@@ -559,52 +574,54 @@ export default function SettingsModal({
               )}
             </div>
 
-            {/* 에디터 미리보기 */}
-            <div className="px-5 pb-3">
-              <label className="text-[10px] text-[#52525b] block mb-1">Preview</label>
-              {(() => {
-                const cc = editorSettings.customColors;
-                const previewBg = cc["editor.background"] || currentEditorTheme?.colors["editor.background"] || (currentEditorTheme?.base === "vs" ? "#ffffff" : "#1e1e1e");
-                const previewFg = cc["editor.foreground"] || currentEditorTheme?.colors["editor.foreground"] || (currentEditorTheme?.base === "vs" ? "#000000" : "#d4d4d4");
-                const previewLineNum = cc["editorLineNumber.foreground"] || currentEditorTheme?.colors["editorLineNumber.foreground"] || (currentEditorTheme?.base === "vs" ? "#999999" : "#858585");
-                const previewLineHl = cc["editor.lineHighlightBackground"] || currentEditorTheme?.colors["editor.lineHighlightBackground"];
-                const isLight = currentEditorTheme?.base === "vs";
-                return (
-                  <div
-                    className="rounded-lg p-3 font-mono text-xs border border-[#3f3f46] overflow-hidden"
-                    style={{
-                      backgroundColor: previewBg,
-                      color: previewFg,
-                      fontFamily: editorSettings.fontFamily,
-                      fontSize: `${Math.min(editorSettings.fontSize, 14)}px`,
-                      lineHeight: editorSettings.lineHeight,
-                    }}
-                  >
-                    <span style={{ color: previewLineNum }}>1</span>{"  "}
-                    <span style={{ color: isLight ? "#0000ff" : "#569cd6" }}>function</span>{" "}
-                    <span style={{ color: isLight ? "#795e26" : "#dcdcaa" }}>greet</span>
-                    {"(name) {"}
-                    <br />
-                    <div style={{ backgroundColor: previewLineHl, margin: "0 -12px", padding: "0 12px", display: "inline-block", width: "calc(100% + 24px)" }}>
-                      <span style={{ color: previewLineNum }}>2</span>{"    "}
-                      <span style={{ color: isLight ? "#0000ff" : "#c586c0" }}>return</span>{" "}
-                      <span style={{ color: isLight ? "#a31515" : "#ce9178" }}>{"`Hello, ${name}!`"}</span>
-                    </div>
-                    <span style={{ color: previewLineNum }}>3</span>{"  }{"}
-                  </div>
-                );
-              })()}
-            </div>
+                {/* 에디터 미리보기 */}
+                <div className="px-5 pb-3">
+                  <label className="text-[10px] text-[#52525b] block mb-1">Preview</label>
+                  {(() => {
+                    const cc = editorSettings.customColors;
+                    const previewBg = cc["editor.background"] || currentEditorTheme?.colors["editor.background"] || (currentEditorTheme?.base === "vs" ? "#ffffff" : "#1e1e1e");
+                    const previewFg = cc["editor.foreground"] || currentEditorTheme?.colors["editor.foreground"] || (currentEditorTheme?.base === "vs" ? "#000000" : "#d4d4d4");
+                    const previewLineNum = cc["editorLineNumber.foreground"] || currentEditorTheme?.colors["editorLineNumber.foreground"] || (currentEditorTheme?.base === "vs" ? "#999999" : "#858585");
+                    const previewLineHl = cc["editor.lineHighlightBackground"] || currentEditorTheme?.colors["editor.lineHighlightBackground"];
+                    const isLight = currentEditorTheme?.base === "vs";
+                    return (
+                      <div
+                        className="rounded-lg p-3 font-mono text-xs border border-[#3f3f46] overflow-hidden"
+                        style={{
+                          backgroundColor: previewBg,
+                          color: previewFg,
+                          fontFamily: editorSettings.fontFamily,
+                          fontSize: `${Math.min(editorSettings.fontSize, 14)}px`,
+                          lineHeight: editorSettings.lineHeight,
+                        }}
+                      >
+                        <span style={{ color: previewLineNum }}>1</span>{"  "}
+                        <span style={{ color: isLight ? "#0000ff" : "#569cd6" }}>function</span>{" "}
+                        <span style={{ color: isLight ? "#795e26" : "#dcdcaa" }}>greet</span>
+                        {"(name) {"}
+                        <br />
+                        <div style={{ backgroundColor: previewLineHl, margin: "0 -12px", padding: "0 12px", display: "inline-block", width: "calc(100% + 24px)" }}>
+                          <span style={{ color: previewLineNum }}>2</span>{"    "}
+                          <span style={{ color: isLight ? "#0000ff" : "#c586c0" }}>return</span>{" "}
+                          <span style={{ color: isLight ? "#a31515" : "#ce9178" }}>{"`Hello, ${name}!`"}</span>
+                        </div>
+                        <span style={{ color: previewLineNum }}>3</span>{"  }{"}
+                      </div>
+                    );
+                  })()}
+                </div>
 
-            {/* 하단 버튼 */}
-            <div className="flex items-center justify-between px-5 py-3 border-t border-[#3f3f46]">
-              <button onClick={onResetEditor} className="text-xs text-[#71717a] hover:text-[#ef4444] transition-colors">
-                Reset Editor
-              </button>
-              <button onClick={onClose} className="px-4 py-1.5 text-xs bg-[#3b82f6] text-[#09090b] rounded hover:bg-[#74c7ec] transition-colors font-medium">
-                Done
-              </button>
-            </div>
+                {/* 하단 버튼 */}
+                <div className="flex items-center justify-between px-5 py-3 border-t border-[#3f3f46]">
+                  <button onClick={onResetEditor} className="text-xs text-[#71717a] hover:text-[#ef4444] transition-colors">
+                    Reset Editor
+                  </button>
+                  <button onClick={onClose} className="px-4 py-1.5 text-xs bg-[#3b82f6] text-[#09090b] rounded hover:bg-[#74c7ec] transition-colors font-medium">
+                    Done
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

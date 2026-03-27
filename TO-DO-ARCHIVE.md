@@ -487,3 +487,48 @@
         - 원인: iframe = 별도 브라우저 컨텍스트 → CPU/GPU/이벤트루프 경쟁 → LLM 스트리밍 속도 저하
         - 수정: 모든 URL 열기를 window.open 새 탭으로 전환
         - WorkspaceView: iframe 제거, URL 입력바 + "새 탭에서 열립니다" 안내로 교체
+
+  - [C] 6-1. 사이드바 단축키 안내 패널 추가 (UI/UX 개선)
+  - [C] 6-2. exit로 명시적 종료 시 자동 재연결 방지
+        - exit/logout으로 SSH 세션 종료 시 auto-reconnect 하지 않음
+        - Sidebar에 "단축키 안내!" 버튼 추가
+
+
+──────────────────────────────────────────────────────────────────────────────
+[2026-03-26] Phase 2. 📝 리모트 파일 에디터 (Editor) — Toast UI Viewer 적용
+──────────────────────────────────────────────────────────────────────────────
+
+  - [C] 2-1. Toast UI Viewer를 사용하여 Markdown 파일 렌더링
+        - Markdown 파일(.md) 열기 시 Toast UI Viewer로 렌더링
+        - @toast-ui/editor 패키지 설치 (--legacy-peer-deps 적용)
+        - 배경색 라이트 테마 적용 (읽기 편함)
+
+  - [C] 2-2. Markdown 파일 Settings 제거
+        - Settings에서 Markdown 파일용 에디터 설정 메뉴 비활성화
+        - Markdown 파일은 default 스타일로만 표시
+        - SettingsModal에 isMarkdownFile prop 추가하여 Markdown 파일 시 UI 비활성화
+
+  - [C] 6-3. 좌측 단축키 버튼 활성 터미널로 명령어 전달
+        - 이전: 무조건 첫 번째 터미널로 명령어 전달
+        - 수정: WorkspaceView의 activeTermId 추적 → App.tsx → Sidebar에서 활성 터미널로 전달
+        - onActiveTerminalChange 콜백으로 세션별 활성 터미널 ID 관리
+
+
+──────────────────────────────────────────────────────────────────────────────
+[2026-03-27] Phase 2. 📝 리모트 파일 에디터 (Editor) — UI 개선
+──────────────────────────────────────────────────────────────────────────────
+
+  - [C] 2-1. Markdown 파일 Edit/Preview 토글 버튼 추가
+        - .md 파일 열 때 뷰어(기본) / 편집 모드 전환 버튼 제공
+        - 뷰어 모드: Toast UI Viewer 렌더링 (기본)
+        - 편집 모드: Monaco Editor 전환
+  - [C] 2-2. Toast UI Editor 사용 시 파일 변경 감지(5초 폴링) 미작동 버그 수정
+  - [C] 2-3. Toast UI Editor getMarkdown() 재직렬화로 인한 파일 내용 오염 버그 수정
+  - [C] 2-4. Editor 우측 상단에 파일 Refresh 버튼 추가
+        - 클릭 시 서버에서 최신 파일 내용 즉시 로드
+  - [C] 2-5. Editor 우측 상단 UI 정리
+        - Files 버튼 제거 (사이드바 Files 탭으로 대체)
+        - 모든 버튼 아이콘+이름 형태로 통일 (bordered box 스타일)
+        - ⬜/⬒ Split · ✏ Edit · 👁 Preview · ↻ Refresh · ≡ Log
+        - 상태 배지: 컬러 점(dot) + 텍스트 (Saving… / Saved / Save failed)
+        - 활성 버튼은 파란색/노란색 계열 강조, 비활성은 다크 회색

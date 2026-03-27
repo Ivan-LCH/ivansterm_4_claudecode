@@ -20,6 +20,7 @@ interface SidebarProps {
   currentSessionId: string | null;
   terminalPreviews: Record<string, string[]>;
   sessionNotifications?: Record<string, number>;
+  activeTerminalIds?: Record<string, string>;
   onSelectSession: (sessionId: string) => void;
   onReconnectSession: (sessionId: string) => void;
   onCloseSession: (sessionId: string) => void;
@@ -173,6 +174,7 @@ export default function Sidebar({
   fileTreeOpenSignal,
   onSendCommand,
   sessionNotifications = {},
+  activeTerminalIds = {},
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<TabType>(activeSessions.length > 0 ? "sessions" : "servers");
   const [filesExpanded, setFilesExpanded] = useState(false);
@@ -507,7 +509,7 @@ export default function Sidebar({
                       onChange={(e) => setClaudeCommand(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && currentSession && claudeCommand.trim()) {
-                          const termId = `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
+                          const termId = activeTerminalIds[currentSession.sessionId] || `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
                           onSendCommand?.(termId, claudeCommand);
                           setClaudeCommand("");
                         }
@@ -520,7 +522,7 @@ export default function Sidebar({
                     <button
                       onClick={() => {
                         if (currentSession && claudeCommand.trim()) {
-                          const termId = `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
+                          const termId = activeTerminalIds[currentSession.sessionId] || `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
                           onSendCommand?.(termId, claudeCommand);
                           setClaudeCommand("");
                         }

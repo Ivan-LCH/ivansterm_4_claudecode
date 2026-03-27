@@ -30,6 +30,7 @@ interface WorkspaceViewProps {
   tailLogRequest?: TailLogRequest | null;
   onOpenFileTree?: () => void;
   autoFocus?: boolean;
+  onActiveTerminalChange?: (terminalId: string) => void;
 }
 
 // 터미널 번호 카운터
@@ -42,7 +43,7 @@ export interface WorkspaceViewRef {
 }
 
 const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
-  ({ sessionId, connectionId, connectionName: _name, workingDir, initialWebUrl, terminalSettings, editorSettings, onSessionStatusChange, reconnectSignal, onTerminalPreview, fileOpenRequest, tailLogRequest, onOpenFileTree, autoFocus }, ref) => {
+  ({ sessionId, connectionId, connectionName: _name, workingDir, initialWebUrl, terminalSettings, editorSettings, onSessionStatusChange, reconnectSignal, onTerminalPreview, fileOpenRequest, tailLogRequest, onOpenFileTree, autoFocus, onActiveTerminalChange }, ref) => {
     void _name;
     const { loadLayout, saveLayout } = useWorkspace(sessionId);
     const [terminals, setTerminals] = useState<TerminalEntry[]>([
@@ -51,7 +52,10 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
     const [termViewMode, setTermViewMode] = useState<TerminalViewMode>("tab");
     const [activeTermId, setActiveTermId] = useState<string>(`term_${connectionId}_${sessionId.slice(-8)}`);
     const activeTermIdRef = useRef(activeTermId);
-    useEffect(() => { activeTermIdRef.current = activeTermId; }, [activeTermId]);
+    useEffect(() => {
+      activeTermIdRef.current = activeTermId;
+      onActiveTerminalChange?.(activeTermId);
+    }, [activeTermId, onActiveTerminalChange]);
     const [layoutLoaded, setLayoutLoaded] = useState(false);
 
     // 터미널 refs (명령 전달용)

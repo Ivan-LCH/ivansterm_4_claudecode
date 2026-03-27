@@ -91,6 +91,8 @@ function App() {
   const sessionLastNotifiedBufferRef = useRef<Record<string, string>>({});
   // WorkspaceView refs (명령 전달용)
   const workspaceRefsRef = useRef<Record<string, WorkspaceViewRef>>({});
+  // 세션별 활성 터미널 ID
+  const [activeTerminalIds, setActiveTerminalIds] = useState<Record<string, string>>({});
   // 세션 목록 변경 시 localStorage에 저장 (disconnected 플래그 제외)
   useEffect(() => {
     const toSave = sessions.map(({ disconnected: _, ...rest }) => rest);
@@ -248,6 +250,7 @@ function App() {
           currentSessionId={currentSessionId}
           terminalPreviews={terminalPreviews}
           sessionNotifications={sessionNotifications}
+          activeTerminalIds={activeTerminalIds}
           onSelectSession={(sid) => {
             setCurrentSessionId(sid);
             setSessionNotifications((prev) => ({ ...prev, [sid]: 0 }));
@@ -351,6 +354,9 @@ function App() {
                 fileOpenRequest={fileOpenRequests[s.sessionId] ?? null}
                 tailLogRequest={tailLogRequests[s.sessionId] ?? null}
                 onOpenFileTree={() => setFileTreeOpenSignal((n) => n + 1)}
+                onActiveTerminalChange={(termId) => {
+                  setActiveTerminalIds((prev) => ({ ...prev, [s.sessionId]: termId }));
+                }}
                 autoFocus={s.sessionId === currentSessionId}
               />
             </div>
@@ -389,6 +395,7 @@ function App() {
           onResetTerminal={resetSettings}
           onResetEditor={resetEditorSettings}
           onClose={() => setShowSettings(false)}
+          isMarkdownFile={false}
         />
       )}
     </div>
