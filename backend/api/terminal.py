@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
@@ -12,8 +13,47 @@ from backend.services.ssh_manager import ssh_manager
 router = APIRouter()
 
 
+@router.get("/api/connections/{conn_id}/tmux-sessions")
+async def list_tmux_sessions(conn_id: int):
+    """해당 서버의 tmux 세션 목록 조회"""
+    async with async_session() as db:
+        conn = await db.get(Connection, conn_id)
+        if not conn:
+            return {"sessions": []}
+
+        password = decrypt(conn.password_encrypted) if conn.password_encrypted else None
+        sessions = await ssh_manager.list_tmux_sessions(
+            host=conn.host,
+            port=conn.port,
+            username=conn.username,
+            password=password if conn.auth_method == "password" else None,
+            private_key_path=conn.private_key_path if conn.auth_method == "key" else None,
+        )
+        return {"sessions": sessions}
+
+
+@router.delete("/api/connections/{conn_id}/tmux-sessions/{session_name}")
+async def kill_tmux_session(conn_id: int, session_name: str):
+    """해당 서버의 특정 tmux 세션 종료"""
+    async with async_session() as db:
+        conn = await db.get(Connection, conn_id)
+        if not conn:
+            return {"ok": False, "reason": "connection not found"}
+
+        password = decrypt(conn.password_encrypted) if conn.password_encrypted else None
+        ok = await ssh_manager.kill_tmux_session(
+            host=conn.host,
+            port=conn.port,
+            username=conn.username,
+            session_name=session_name,
+            password=password if conn.auth_method == "password" else None,
+            private_key_path=conn.private_key_path if conn.auth_method == "key" else None,
+        )
+        return {"ok": ok}
+
+
 @router.websocket("/ws/terminal")
-async def terminal_websocket(websocket: WebSocket, conn_id: int, session_id: str = ""):
+async def terminal_websocket(websocket: WebSocket, conn_id: int, session_id: str = "", selected_tmux: str = ""):
     """SSH 터미널 WebSocket 엔드포인트
 
     클라이언트 → 서버 메시지:
@@ -39,14 +79,22 @@ async def terminal_websocket(websocket: WebSocket, conn_id: int, session_id: str
         password = decrypt(conn.password_encrypted) if conn.password_encrypted else None
         private_key_path = conn.private_key_path
         working_dir = conn.last_working_dir or "~"
+        conn_name = conn.name or f"conn{conn_id}"
 
     # 세션 키: WebSocket별 고유
     session_key = f"terminal_{conn_id}_{id(websocket)}"
 
     try:
-        # tmux 세션 이름: session_id가 있으면 세션별 고유 tmux 사용 (재접속 시 새 터미널 보장)
-        safe_sid = re.sub(r"[^a-zA-Z0-9_-]", "_", session_id)[:16] if session_id else ""
-        tmux_name = f"ivan_{conn_id}_{safe_sid}" if safe_sid else f"ivan_{conn_id}"
+        # selected_tmux: 사용자가 명시적으로 이어받을 세션 이름
+        # 없으면 기존 방식: session_id 기반 고유 tmux 이름 생성
+        if selected_tmux:
+            tmux_name = selected_tmux
+        else:
+            # 6-4: {서버명}_{MMDD-HHMM} 형식
+            safe_name = re.sub(r"[^a-zA-Z0-9_-]", "-", conn_name)
+            safe_name = re.sub(r"-{2,}", "-", safe_name).strip("-")[:20] or "session"
+            now = datetime.now()
+            tmux_name = f"{safe_name}_{now.strftime('%m%d-%H%M')}"
 
         # SSH 연결 (tmux 세션 자동 연결)
         session = await ssh_manager.connect(

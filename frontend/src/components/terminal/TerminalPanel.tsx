@@ -6,6 +6,7 @@ import type { TerminalSettings } from "../../types";
 interface TerminalPanelProps {
   connectionId: number;
   terminalId?: string;
+  selectedTmux?: string;
   settings: TerminalSettings;
   onDisconnect?: () => void;
   onStatusChange?: (disconnected: boolean) => void;
@@ -25,7 +26,7 @@ const MIN_THUMB_RATIO = 0.08;  // 썸 최소 높이 비율
 const MAX_THUMB_RATIO = 0.90;  // 썸 최대 높이 비율
 
 const TerminalPanel = forwardRef<TerminalPanelRef, TerminalPanelProps>(
-  ({ connectionId, terminalId, settings, onDisconnect, onStatusChange, reconnectSignal, onBufferUpdate, autoFocus }, ref) => {
+  ({ connectionId, terminalId, selectedTmux, settings, onDisconnect, onStatusChange, reconnectSignal, onBufferUpdate, autoFocus }, ref) => {
 
     // onBufferUpdate를 래핑해 스크롤 상태 동기화 (순서 중요: useTerminal 호출 전에 ref 생성)
     const bufferUpdateWrapRef = useRef<((lines: string[]) => void) | null>(null);
@@ -34,6 +35,7 @@ const TerminalPanel = forwardRef<TerminalPanelRef, TerminalPanelProps>(
     const { containerRef, connect, disconnect, reconnect, focus, isDisconnected, terminalRef, wsRef } = useTerminal({
       connectionId,
       terminalId,
+      selectedTmux,
       settings,
       onDisconnect,
       onStatusChange,

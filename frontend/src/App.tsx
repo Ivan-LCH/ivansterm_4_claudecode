@@ -33,6 +33,7 @@ interface Session {
   workingDir: string;
   serviceUrl?: string;      // 세션 시작 시 자동 오픈할 Web Preview URL
   disconnected?: boolean;
+  tmuxNames?: string[];     // 실제 연결된 tmux 세션명 목록 (Close 시 일괄 kill용)
 }
 
 // 고유 세션 ID 생성
@@ -70,6 +71,7 @@ function App() {
   const { settings: editorSettings, updateSettings: updateEditorSettings, resetSettings: resetEditorSettings } = useEditorSettings();
   const [showModal, setShowModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [closeConfirmSessionId, setCloseConfirmSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<Session[]>(loadSavedSessions);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(loadSavedCurrentSession);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -180,7 +182,24 @@ function App() {
   };
 
   // 세션 닫기
+  // × 버튼 클릭 시 확인 다이얼로그 표시
   const handleCloseSession = (sessionId: string) => {
+    setCloseConfirmSessionId(sessionId);
+  };
+
+  // 실제 세션 제거 (tmux kill 여부 선택)
+  const doCloseSession = (sessionId: string, killTmux: boolean) => {
+    setCloseConfirmSessionId(null);
+    if (killTmux) {
+      const target = sessions.find((s) => s.sessionId === sessionId);
+      if (target?.tmuxNames?.length && target?.connectionId) {
+        target.tmuxNames.forEach((name) => {
+          fetch(`/api/connections/${target.connectionId}/tmux-sessions/${encodeURIComponent(name)}`, {
+            method: "DELETE",
+          }).catch(() => {});
+        });
+      }
+    }
     setSessions((prev) => {
       const remaining = prev.filter((s) => s.sessionId !== sessionId);
       if (currentSessionId === sessionId) {
@@ -219,6 +238,47 @@ function App() {
 
   return (
     <div className="h-screen w-screen bg-[#09090b] flex flex-col overflow-hidden">
+      {/* 세션 닫기 확인 다이얼로그 */}
+      {closeConfirmSessionId && (() => {
+        const target = sessions.find((s) => s.sessionId === closeConfirmSessionId);
+        return (
+          <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60">
+            <div className="bg-[#18181b] border border-[#3f3f46] rounded-lg shadow-2xl w-[400px] max-w-[90vw]">
+              <div className="px-5 py-4 border-b border-[#3f3f46]">
+                <h2 className="text-sm font-semibold text-[#f4f4f5]">세션 닫기</h2>
+                <p className="text-xs text-[#71717a] mt-1">
+                  <span className="text-[#a1a1aa] font-medium">{target?.name}</span> 세션을 어떻게 닫으시겠습니까?
+                </p>
+              </div>
+              <div className="px-5 py-4 flex flex-col gap-2">
+                <button
+                  onClick={() => doCloseSession(closeConfirmSessionId, false)}
+                  className="w-full px-4 py-2.5 rounded bg-[#27272a] hover:bg-[#3f3f46] border border-[#3f3f46] text-left transition-colors"
+                >
+                  <div className="text-sm font-medium text-[#f4f4f5]">나가기</div>
+                  <div className="text-xs text-[#71717a] mt-0.5">IvansTerm에서만 나갑니다. tmux 세션은 서버에 유지됩니다.</div>
+                </button>
+                <button
+                  onClick={() => doCloseSession(closeConfirmSessionId, true)}
+                  className="w-full px-4 py-2.5 rounded bg-[#27272a] hover:bg-[#3f3f46] border border-[#3f3f46] hover:border-[#ef4444]/50 text-left transition-colors"
+                >
+                  <div className="text-sm font-medium text-[#ef4444]">세션 종료</div>
+                  <div className="text-xs text-[#71717a] mt-0.5">tmux 세션을 서버에서 완전히 종료합니다. 다른 클라이언트도 끊깁니다.</div>
+                </button>
+              </div>
+              <div className="px-5 pb-4 flex justify-end">
+                <button
+                  onClick={() => setCloseConfirmSessionId(null)}
+                  className="px-4 py-1.5 text-xs text-[#71717a] hover:text-[#a1a1aa] transition-colors"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <PanelGroup direction="horizontal" className="flex-1 overflow-hidden">
         {/* 좌측 사이드바 Panel */}
         <Panel
@@ -358,6 +418,13 @@ function App() {
                   setActiveTerminalIds((prev) => ({ ...prev, [s.sessionId]: termId }));
                 }}
                 autoFocus={s.sessionId === currentSessionId}
+                onTmuxNamesChanged={(tmuxNames) => {
+                  setSessions((prev) =>
+                    prev.map((sess) =>
+                      sess.sessionId === s.sessionId ? { ...sess, tmuxNames } : sess
+                    )
+                  );
+                }}
               />
             </div>
           );

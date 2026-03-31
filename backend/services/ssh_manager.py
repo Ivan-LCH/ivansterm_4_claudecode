@@ -98,6 +98,75 @@ class SSHManager:
     def get_session(self, session_key: str) -> Optional[SSHSession]:
         return self._sessions.get(session_key)
 
+    async def list_tmux_sessions(
+        self,
+        host: str,
+        port: int,
+        username: str,
+        password: Optional[str] = None,
+        private_key_path: Optional[str] = None,
+    ) -> list:
+        """원격 서버의 tmux 세션 목록 조회 (임시 SSH 연결 사용)"""
+        kwargs: dict = {
+            "host": host,
+            "port": port,
+            "username": username,
+            "known_hosts": None,
+        }
+        if password:
+            kwargs["password"] = password
+        elif private_key_path:
+            kwargs["client_keys"] = [private_key_path]
+
+        try:
+            async with asyncssh.connect(**kwargs) as conn:
+                result = await conn.run(
+                    "tmux ls -F '#{session_name}\t#{session_windows}\t#{session_attached}\t#{session_created_string}' 2>/dev/null",
+                    check=False,
+                )
+                sessions = []
+                if result.stdout and result.stdout.strip():
+                    for line in result.stdout.strip().split("\n"):
+                        parts = line.split("\t")
+                        if parts and parts[0]:
+                            sessions.append({
+                                "name": parts[0],
+                                "windows": int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1,
+                                "attached": parts[2] == "1" if len(parts) > 2 else False,
+                                "created": parts[3] if len(parts) > 3 else "",
+                            })
+                return sessions
+        except Exception:
+            return []
+
+    async def kill_tmux_session(
+        self,
+        host: str,
+        port: int,
+        username: str,
+        session_name: str,
+        password: Optional[str] = None,
+        private_key_path: Optional[str] = None,
+    ) -> bool:
+        """원격 서버의 특정 tmux 세션 종료"""
+        kwargs: dict = {
+            "host": host,
+            "port": port,
+            "username": username,
+            "known_hosts": None,
+        }
+        if password:
+            kwargs["password"] = password
+        elif private_key_path:
+            kwargs["client_keys"] = [private_key_path]
+
+        try:
+            async with asyncssh.connect(**kwargs) as conn:
+                await conn.run(f"tmux kill-session -t {session_name!r} 2>/dev/null", check=False)
+            return True
+        except Exception:
+            return False
+
     async def close_all(self):
         """모든 세션 종료"""
         keys = list(self._sessions.keys())

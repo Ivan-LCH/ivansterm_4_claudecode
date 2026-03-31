@@ -16,6 +16,7 @@ export interface XtermScrollInfo {
 interface UseTerminalOptions {
   connectionId: number;
   terminalId?: string;
+  selectedTmux?: string;
   settings: TerminalSettings;
   onDisconnect?: () => void;
   onStatusChange?: (disconnected: boolean) => void;
@@ -28,7 +29,7 @@ const RECONNECT_BASE_DELAY = 1000;   // 초기 1초
 const RECONNECT_MAX_DELAY = 30000;   // 최대 30초
 const RECONNECT_MAX_RETRIES = 10;
 
-export function useTerminal({ connectionId, terminalId, settings, onDisconnect, onStatusChange, onBufferUpdate, onScrollUpdate }: UseTerminalOptions) {
+export function useTerminal({ connectionId, terminalId, selectedTmux, settings, onDisconnect, onStatusChange, onBufferUpdate, onScrollUpdate }: UseTerminalOptions) {
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -102,7 +103,8 @@ export function useTerminal({ connectionId, terminalId, settings, onDisconnect, 
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const sid = terminalId ? `&session_id=${encodeURIComponent(terminalId)}` : "";
-    const wsUrl = `${protocol}//${window.location.host}/ws/terminal?conn_id=${connectionId}${sid}`;
+    const tmuxParam = selectedTmux ? `&selected_tmux=${encodeURIComponent(selectedTmux)}` : "";
+    const wsUrl = `${protocol}//${window.location.host}/ws/terminal?conn_id=${connectionId}${sid}${tmuxParam}`;
     const ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
