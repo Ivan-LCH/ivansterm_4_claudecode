@@ -37,6 +37,7 @@
 ### 📸 Screenshots
 
 <img width="2214" height="949" alt="image" src="https://github.com/user-attachments/assets/4bb304fd-5e0f-4741-81a9-cc4e2845c8c2" />
+![1000033750](https://github.com/user-attachments/assets/9c257922-6ea0-4a46-a7a0-89681f3c28df)
 
 
 ## ✨ Key Features
