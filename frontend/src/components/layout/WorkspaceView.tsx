@@ -142,6 +142,9 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
   const [webPanelVisible, setWebPanelVisible] = useState(false);
   const [webInputUrl, setWebInputUrl] = useState("");
 
+  // 에디터 패널 숨김 상태
+  const [editorCollapsed, setEditorCollapsed] = useState(false);
+
     // 터미널별 연결 상태 추적
     const termStatusRef = useRef<Record<string, boolean>>({});
     const handleTermStatusChange = useCallback((termId: string, disconnected: boolean) => {
@@ -182,6 +185,7 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
       layoutRef.current = layout;
       setInitialLayout(layout);
       if (layout.termViewMode) setTermViewMode(layout.termViewMode);
+      if (layout.editorCollapsed) setEditorCollapsed(layout.editorCollapsed);
       // Web 패널 URL 복원
       if (layout.webPanelUrl) {
         setWebInputUrl(layout.webPanelUrl);
@@ -203,6 +207,19 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
     setWebInputUrl(url);
     window.open(url, '_blank', 'noopener,noreferrer');
   }, [webInputUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 에디터 패널 토글
+  const toggleEditorPanel = useCallback(() => {
+    setEditorCollapsed((v) => {
+      const next = !v;
+      persistLayout({ editorCollapsed: next });
+      if (!next) {
+        // 에디터 열릴 때 터미널 포커스 유지
+        setTimeout(() => terminalRefsRef.current[activeTermIdRef.current]?.focus(), 100);
+      }
+      return next;
+    });
+  }, [persistLayout]);
 
   // Web 패널 토글
   const toggleWebPanel = useCallback(() => {
@@ -332,36 +349,48 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
         style={{ visibility: webPanelVisible ? "hidden" : "visible" }}
         onLayout={handleMainResize}
       >
-        {/* 좌측: Editor */}
-        <Panel defaultSize={initialLayout.editorSplitSize ?? 50} minSize={15}>
-          <EditorPanel
-            connectionId={connectionId}
-            workingDir={workingDir}
-            initialLayout={initialLayout}
-            onLayoutChange={persistLayout}
-            editorSettings={editorSettings}
-            terminalTheme={terminalSettings.theme}
-            fileOpenRequest={fileOpenRequest}
-            tailLogRequest={tailLogRequest}
-            onOpenFileTree={onOpenFileTree}
-          />
-        </Panel>
+        {/* 좌측: Editor (숨김 시 언마운트) */}
+        {!editorCollapsed && (
+          <>
+            <Panel defaultSize={initialLayout.editorSplitSize ?? 50} minSize={15}>
+              <EditorPanel
+                connectionId={connectionId}
+                workingDir={workingDir}
+                initialLayout={initialLayout}
+                onLayoutChange={persistLayout}
+                editorSettings={editorSettings}
+                terminalTheme={terminalSettings.theme}
+                fileOpenRequest={fileOpenRequest}
+                tailLogRequest={tailLogRequest}
+                onOpenFileTree={onOpenFileTree}
+              />
+            </Panel>
 
-        {/* 리사이즈 핸들 */}
-        <PanelResizeHandle className="group relative w-1 hover:w-1.5 bg-[#3f3f46] hover:bg-[#3b82f6] transition-all cursor-col-resize">
-          <div className="absolute inset-y-0 -left-1 -right-1" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <div className="w-0.5 h-0.5 rounded-full bg-[#f4f4f5]" />
-            <div className="w-0.5 h-0.5 rounded-full bg-[#f4f4f5]" />
-            <div className="w-0.5 h-0.5 rounded-full bg-[#f4f4f5]" />
-          </div>
-        </PanelResizeHandle>
+            {/* 리사이즈 핸들 */}
+            <PanelResizeHandle className="group relative w-1 hover:w-1.5 bg-[#3f3f46] hover:bg-[#3b82f6] transition-all cursor-col-resize">
+              <div className="absolute inset-y-0 -left-1 -right-1" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="w-0.5 h-0.5 rounded-full bg-[#f4f4f5]" />
+                <div className="w-0.5 h-0.5 rounded-full bg-[#f4f4f5]" />
+                <div className="w-0.5 h-0.5 rounded-full bg-[#f4f4f5]" />
+              </div>
+            </PanelResizeHandle>
+          </>
+        )}
 
         {/* 우측: Terminal */}
-        <Panel defaultSize={initialLayout.editorSplitSize ? (100 - initialLayout.editorSplitSize) : 50} minSize={15}>
+        <Panel defaultSize={editorCollapsed ? 100 : (initialLayout.editorSplitSize ? (100 - initialLayout.editorSplitSize) : 50)} minSize={15}>
         <div className="flex flex-col h-full">
           {/* 터미널 헤더 바 */}
           <div className="flex items-center gap-1 px-2 py-0.5 bg-[#18181b] border-b border-[#3f3f46] shrink-0">
+            {/* 에디터 패널 토글 버튼 */}
+            <button
+              onClick={toggleEditorPanel}
+              className="px-1.5 py-0.5 text-xs text-[#52525b] hover:text-[#a1a1aa] hover:bg-[#3f3f46] rounded transition-colors shrink-0 font-mono"
+              title={editorCollapsed ? "에디터 패널 열기" : "에디터 패널 숨기기"}
+            >
+              {editorCollapsed ? "»" : "«"}
+            </button>
             {termViewMode === "tab" ? (
               <div className="flex items-center gap-0 overflow-x-auto flex-1">
                 {terminals.map((t) => (

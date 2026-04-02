@@ -16,6 +16,7 @@ export interface WorkspaceLayout {
   logFilePath?: string;           // 로그 뷰어에서 열린 파일 경로
   webPanelUrl?: string;           // Web 패널 URL
   webPanelVisible?: boolean;      // Web 패널 표시 여부
+  editorCollapsed?: boolean;      // 에디터 패널 숨김 여부
 }
 
 export function useWorkspace(sessionId?: string) {
