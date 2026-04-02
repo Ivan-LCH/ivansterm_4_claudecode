@@ -97,18 +97,24 @@
    cd ivansterm_4_claudecode
    ```
 
-2. **Run with Docker Compose:**
+2. **Environment Variables (.env Setup):**
+   제공된 `.env.example` 파일을 복사하여 숨김 파일인 `.env`를 생성하고 필요한 설정값을 기입합니다.
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Run with Docker Compose:**
    ```bash
    docker-compose up --build -d
    ```
 
-3. **Start the Server (Build & Run):**
+4. **Start the Server (Build & Run):**
    컨테이너가 실행된 후, 구동 스크립트를 통해 프론트엔드 빌드(`npm run build`) 및 백엔드 서버를 시작합니다.
    ```bash
    docker exec ivansterm bash -c "mkdir -p /app/logs && cd /app && bash start_server.sh >> /app/logs/server.log 2>&1"
    ```
 
-4. **Access the application:**
+5. **Access the application:**
    구동이 완료되면 브라우저를 열고 다음 주소로 접속합니다:
    ```text
    https://localhost:8099
