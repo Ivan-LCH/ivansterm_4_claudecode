@@ -36,7 +36,8 @@
 
 ### 📸 Screenshots
 
-> **안내:** [여기에 프로젝트 스크린샷을 추가하여 UI를 자랑해 보세요!]
+<img width="2214" height="949" alt="image" src="https://github.com/user-attachments/assets/4bb304fd-5e0f-4741-81a9-cc4e2845c8c2" />
+
 
 ## ✨ Key Features
 
