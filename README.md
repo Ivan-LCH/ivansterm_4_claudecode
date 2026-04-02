@@ -43,13 +43,14 @@
 
 - **🌐 Browser-Based SSH Terminal** 
   - `xterm.js` 기반의 네이티브 수준 콘솔 경험 제공
-  - 멀티 탭 및 화면 분할 지원
-  - `tmux` 자동 연동 및 지수형 백오프(Exponential Backoff) 재연결 알고리즘
+  - 멀티 탭 및 수직 분할 화면 지원 (최대 3개 터미널 동시 표시)
+  - `tmux` 자동 연동 및 세션 관리 UI (기존 세션 이어받기, 명시적 세션 종료, 지수형 백오프 재연결 등)
 - **📝 Advanced File Editor**
-  - VS Code의 핵심인 `Monaco Editor` 통합
+  - VS Code의 핵심인 `Monaco Editor` 통합 및 Markdown 전용 뷰어(Toast UI Viewer) 내장
   - 지연 로딩(Lazy-loading)을 지원하며 실시간 변경 감지가 가능한 SFTP 기반 파일 트리
 - **📊 Real-time Log Viewer**
   - 비동기 `tail -f` 메커니즘을 사용한 실시간 로그 스트리밍 기능
+  - 접속 또는 새로고침 시 로그 컨텍스트 파악을 위한 최근 기록 유지
 - **📁 Drag & Drop File Transfer**
   - 드래그 앤 드롭 방식을 통한 간편한 파일 업로드 (최대 100MB 지원)
   - 우클릭 컨텍스트 메뉴를 통한 직관적인 다운로드
@@ -57,10 +58,10 @@
   - 다수의 원격 서버에 동시 접속 지원
   - 세션 별 독립적인 워크스페이스 레이아웃 자동 저장 및 복원
 - **🔍 Dynamic Web Preview**
-  - 원격 서비스 및 포트를 브라우저 내 iframe 기반으로 즉시 미리보기
+  - 원격 서비스 URL을 세션별로 관리하며, LLM 처리 지연 방지를 위해 새 창(New Tab)으로 띄워 쾌적한 미리보기 지원
 - **🤖 Vibe Coding Workspace (Claude Code Optimized)**
   - **터미널 × 에디터 × 로그 뷰어 복합 활용**: `claude code` 에이전트 구동을 메인으로 하면서, 진행 중인 `TO-DO-LIST.md` 작업 목록을 실시간 관리하고 백엔드 서버 로그를 동시에 모니터링하기 위한 완벽한 다이내믹 UI 패널 제공
-  - Claude 통합(Expander)을 통해 AI의 응답 아이디어를 터미널 명령어 또는 에디터에 직관적으로 전송 및 실행 가능
+  - 사이드바 Claude 확장 패널(Expander)을 통해 AI 응답(명령어, 옵션 등)을 현재 터미널에 즉시 전송 및 실행 (Telegram 플러그인 프리셋 지원)
 
 ## 🛠 Tech Stack
 
@@ -101,8 +102,14 @@
    docker-compose up --build -d
    ```
 
-3. **Access the application:**
-   브라우저를 열고 다음 주소로 접속합니다:
+3. **Start the Server (Build & Run):**
+   컨테이너가 실행된 후, 구동 스크립트를 통해 프론트엔드 빌드(`npm run build`) 및 백엔드 서버를 시작합니다.
+   ```bash
+   docker exec ivansterm bash -c "mkdir -p /app/logs && cd /app && bash start_server.sh >> /app/logs/server.log 2>&1"
+   ```
+
+4. **Access the application:**
+   구동이 완료되면 브라우저를 열고 다음 주소로 접속합니다:
    ```text
    https://localhost:8099
    ```
@@ -110,8 +117,9 @@
 
 ## 📖 Usage Guide
 
-- **Connection Management:** 설정이나 접속 관리자에서 대상 서버의 SSH 정보를 추가합니다. 비밀번호 및 Private Key 등 민감한 정보는 내부적으로 구축된 SQLite 데이터베이스에 강력한 Fernet 알고리즘으로 암호화되어 안전하게 보관됩니다.
-- **Layout Management:** 파일 트리, 에디터 및 터미널 패널의 경계를 마우스로 드래그하여 레이아웃 크기를 사용자 정의할 수 있습니다. 수정된 레이아웃은 세션별로 자동 임시 보관됩니다.
+- **Connection Management:** 사이드바에서 대상 서버의 SSH 정보 및 작업 디렉토리를 추가/관리합니다. 비밀번호 및 Private Key 등 민감한 정보는 내부적으로 구축된 SQLite 데이터베이스에 강력한 Fernet 알고리즘으로 암호화되어 안전하게 보관됩니다.
+- **Session & tmux Integration:** 서버 접속 시 활성화된 `tmux` 세션 목록이 표시되어 기존 작업을 깔끔하게 이어갈 수 있으며, 앱에서 세션을 종료할 때 원격 터미널 프로세스도 함께 정리할 수 있습니다.
+- **Layout Management:** 파일 트리, 에디터, 로그 패널 및 터미널 패널의 경계를 마우스로 드래그하여 레이아웃 크기를 사용자 정의할 수 있습니다. 수정된 레이아웃과 열려진 탭 상태는 세션별로 자동 보관 및 복원됩니다.
 - **Hot Reloading / Re-deploying:** 개발 중 백엔드 코드를 수정했다면, 컨테이너 내부 환경에서 손쉽게 서버를 재기동할 수 있습니다.
   ```bash
   docker exec ivansterm bash -c "mkdir -p /app/logs && cd /app && bash start_server.sh >> /app/logs/server.log 2>&1"
