@@ -159,7 +159,9 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
       sendCommandToTerminal: (terminalId: string, command: string) => {
         const termRef = terminalRefsRef.current[terminalId];
         if (termRef?.write) {
-          termRef.write(command + '\r');
+          // ESC 등 제어 문자는 \r 없이 raw 전송
+          const data = command.startsWith('\x1b') ? command : command + '\r';
+          termRef.write(data);
           setTimeout(() => termRef.focus?.(), 50);
         }
       },

@@ -484,13 +484,12 @@ export default function Sidebar({
                         { label: "claude", cmd: "claude" },
                         { label: "resume", cmd: "claude --resume" },
                         { label: "telegram", cmd: "claude --channels plugin:telegram@claude-plugins-official" },
-                        { label: "pwd", cmd: "pwd" },
                       ].map((preset) => (
                         <button
                           key={preset.cmd}
                           onClick={() => {
                             if (currentSession) {
-                              const termId = `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
+                              const termId = activeTerminalIds[currentSession.sessionId] || `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
                               onSendCommand?.(termId, preset.cmd);
                               setClaudeCommand("");
                             }
@@ -501,6 +500,20 @@ export default function Sidebar({
                           {preset.label}
                         </button>
                       ))}
+                      {/* ESC 버튼: 모바일에서 ESC 키 대용 */}
+                      <button
+                        onClick={() => {
+                          if (currentSession) {
+                            const termId = activeTerminalIds[currentSession.sessionId] || `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
+                            onSendCommand?.(termId, '\x1b');
+                          }
+                        }}
+                        disabled={!currentSession || currentSession.disconnected}
+                        className="text-[9px] px-2 py-1 bg-[#27272a] text-[#f87171] border border-[#ef4444] rounded hover:bg-[#ef4444] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        title="ESC 키 전송"
+                      >
+                        ESC
+                      </button>
                     </div>
                     {/* 입력 창 */}
                     <input

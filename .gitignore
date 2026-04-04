@@ -25,6 +25,10 @@ server.pid
 .vscode/
 .idea/
 
+# Vim swap files
+*.swp
+*.swo
+
 # OS
 .DS_Store
 Thumbs.db
