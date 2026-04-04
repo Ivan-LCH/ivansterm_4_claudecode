@@ -3,7 +3,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import type { editor as monacoEditor } from "monaco-editor";
 // @ts-ignore
-import Viewer from "@toast-ui/editor/viewer";
+import Viewer from "@toast-ui/editor/dist/toastui-editor-viewer";
 import "@toast-ui/editor/dist/toastui-editor-viewer.css";
 import LogViewer from "./LogViewer";
 import { useSFTP } from "../../hooks/useSFTP";
@@ -284,7 +284,7 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
   );
 
   // 최신 saveFile ref
-  const saveRef = useRef<() => void>(() => {});
+  const saveRef = useRef<() => void>(() => { });
   useEffect(() => {
     saveRef.current = () => {
       if (focusedEditor === "split" && splitTabId) {
@@ -565,13 +565,12 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
           return (
             <div
               key={tab.id}
-              className={`flex items-center gap-1 px-3 py-1.5 text-[15px] cursor-pointer border-r border-[#3f3f46] shrink-0 transition-colors ${
-                isActive
+              className={`flex items-center gap-1 px-3 py-1.5 text-[15px] cursor-pointer border-r border-[#3f3f46] shrink-0 transition-colors ${isActive
                   ? "bg-[#09090b] text-[#f4f4f5]"
                   : isSplit
-                  ? "bg-[#09090b]/70 text-[#e4e4e7]"
-                  : "text-[#52525b] hover:text-[#a1a1aa] hover:bg-[#09090b]/50"
-              }`}
+                    ? "bg-[#09090b]/70 text-[#e4e4e7]"
+                    : "text-[#52525b] hover:text-[#a1a1aa] hover:bg-[#09090b]/50"
+                }`}
               onClick={() => setActiveTabId(tab.id)}
               onContextMenu={(e) => {
                 if (viewMode === "split") {
@@ -603,19 +602,17 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
           {/* 상태 배지 */}
           {saveStatus !== "idle" && (
             <span
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${
-                saveStatus === "saving"
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${saveStatus === "saving"
                   ? "bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/30"
                   : saveStatus === "saved"
-                  ? "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30"
-                  : "bg-[#ef4444]/10 text-[#ef4444] border-[#ef4444]/30"
-              }`}
+                    ? "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/30"
+                    : "bg-[#ef4444]/10 text-[#ef4444] border-[#ef4444]/30"
+                }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                saveStatus === "saving" ? "bg-[#f59e0b] animate-pulse"
-                : saveStatus === "saved" ? "bg-[#10b981]"
-                : "bg-[#ef4444]"
-              }`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${saveStatus === "saving" ? "bg-[#f59e0b] animate-pulse"
+                  : saveStatus === "saved" ? "bg-[#10b981]"
+                    : "bg-[#ef4444]"
+                }`} />
               {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : "Save failed"}
             </span>
           )}
@@ -627,11 +624,10 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
           {tabs.length >= 2 && (
             <button
               onClick={toggleViewMode}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
-                viewMode === "split"
+              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${viewMode === "split"
                   ? "bg-[#3b82f6]/15 text-[#3b82f6] border-[#3b82f6]/40 hover:bg-[#3b82f6]/25"
                   : "bg-[#27272a] text-[#a1a1aa] border-[#3f3f46] hover:text-[#f4f4f5] hover:border-[#52525b]"
-              }`}
+                }`}
               title={viewMode === "split" ? "Single view" : "Split view"}
             >
               <span className="text-[13px]">{viewMode === "split" ? "⬒" : "⬜"}</span>
@@ -643,11 +639,10 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
           {activeTab && isMarkdown(activeTab.filename) && (
             <button
               onClick={() => setMdEditMode((v) => !v)}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
-                mdEditMode
+              className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${mdEditMode
                   ? "bg-[#f59e0b]/15 text-[#f59e0b] border-[#f59e0b]/40 hover:bg-[#f59e0b]/25"
                   : "bg-[#27272a] text-[#a1a1aa] border-[#3f3f46] hover:text-[#f4f4f5] hover:border-[#52525b]"
-              }`}
+                }`}
               title={mdEditMode ? "Switch to Preview" : "Switch to Edit mode"}
             >
               <span className="text-[12px]">{mdEditMode ? "👁" : "✏"}</span>
@@ -668,11 +663,10 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
           {/* Log 버튼 */}
           <button
             onClick={toggleLog}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${
-              logExpanded
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border transition-colors ${logExpanded
                 ? "bg-[#3b82f6]/15 text-[#3b82f6] border-[#3b82f6]/40 hover:bg-[#3b82f6]/25"
                 : "bg-[#27272a] text-[#a1a1aa] border-[#3f3f46] hover:text-[#f4f4f5] hover:border-[#52525b]"
-            }`}
+              }`}
             title={logExpanded ? "Hide log viewer" : "Show log viewer"}
           >
             <span className="text-[12px]">≡</span>
@@ -685,61 +679,60 @@ export default function EditorPanel({ connectionId, workingDir: _workingDir, ini
       <div className="flex-1 overflow-hidden">
         <PanelGroup direction="vertical">
           {/* 에디터 영역 */}
-              <Panel minSize={20}>
-                {viewMode === "split" ? (
-                  <PanelGroup direction="vertical">
-                    <Panel minSize={20}>
-                      {renderEditor(activeTab, handleEditorMount, handleEditorChange, "Select a file to edit")}
-                    </Panel>
-                    <PanelResizeHandle className="group relative h-0.5 hover:h-1 bg-[#3f3f46] hover:bg-[#3b82f6] transition-all cursor-row-resize">
-                      <div className="absolute inset-x-0 -top-1 -bottom-1" />
-                    </PanelResizeHandle>
-                    <Panel minSize={20}>
-                      <div className="flex flex-col h-full">
-                        {tabs.length > 1 && (
-                          <div className="flex items-center bg-[#27272a] border-b border-[#3f3f46] shrink-0 overflow-x-auto">
-                            {tabs.map((tab) => (
-                              <button
-                                key={tab.id}
-                                onClick={() => setSplitTabId(tab.id)}
-                                className={`px-2 py-0.5 text-xs border-r border-[#3f3f46] transition-colors ${
-                                  tab.id === splitTabId
-                                    ? "text-[#f4f4f5] bg-[#09090b]"
-                                    : "text-[#52525b] hover:text-[#a1a1aa]"
-                                }`}
-                              >
-                                {tab.filename}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        <div className="flex-1 overflow-hidden">
-                          {renderEditor(splitTab, handleSplitEditorMount, handleSplitEditorChange, "Right-click a tab or select below")}
-                        </div>
+          <Panel minSize={20}>
+            {viewMode === "split" ? (
+              <PanelGroup direction="vertical">
+                <Panel minSize={20}>
+                  {renderEditor(activeTab, handleEditorMount, handleEditorChange, "Select a file to edit")}
+                </Panel>
+                <PanelResizeHandle className="group relative h-0.5 hover:h-1 bg-[#3f3f46] hover:bg-[#3b82f6] transition-all cursor-row-resize">
+                  <div className="absolute inset-x-0 -top-1 -bottom-1" />
+                </PanelResizeHandle>
+                <Panel minSize={20}>
+                  <div className="flex flex-col h-full">
+                    {tabs.length > 1 && (
+                      <div className="flex items-center bg-[#27272a] border-b border-[#3f3f46] shrink-0 overflow-x-auto">
+                        {tabs.map((tab) => (
+                          <button
+                            key={tab.id}
+                            onClick={() => setSplitTabId(tab.id)}
+                            className={`px-2 py-0.5 text-xs border-r border-[#3f3f46] transition-colors ${tab.id === splitTabId
+                                ? "text-[#f4f4f5] bg-[#09090b]"
+                                : "text-[#52525b] hover:text-[#a1a1aa]"
+                              }`}
+                          >
+                            {tab.filename}
+                          </button>
+                        ))}
                       </div>
-                    </Panel>
-                  </PanelGroup>
-                ) : (
-                  renderEditor(activeTab, handleEditorMount, handleEditorChange, "Select a file to edit")
-                )}
-              </Panel>
+                    )}
+                    <div className="flex-1 overflow-hidden">
+                      {renderEditor(splitTab, handleSplitEditorMount, handleSplitEditorChange, "Right-click a tab or select below")}
+                    </div>
+                  </div>
+                </Panel>
+              </PanelGroup>
+            ) : (
+              renderEditor(activeTab, handleEditorMount, handleEditorChange, "Select a file to edit")
+            )}
+          </Panel>
 
-              {/* 로그 뷰어 */}
-              {logExpanded && (
-                <>
-                  <PanelResizeHandle className="group relative h-0.5 hover:h-1 bg-[#3f3f46] hover:bg-[#3b82f6] transition-all cursor-row-resize">
-                    <div className="absolute inset-x-0 -top-1 -bottom-1" />
-                  </PanelResizeHandle>
-                  <Panel defaultSize={initialLayout?.logPanelSize ?? 30} minSize={15} maxSize={60}>
-                    <LogViewer
-                      connectionId={connectionId}
-                      logFilePath={logFilePath}
-                      onLogPathChange={handleLogPathChange}
-                      terminalTheme={terminalTheme}
-                    />
-                  </Panel>
-                </>
-              )}
+          {/* 로그 뷰어 */}
+          {logExpanded && (
+            <>
+              <PanelResizeHandle className="group relative h-0.5 hover:h-1 bg-[#3f3f46] hover:bg-[#3b82f6] transition-all cursor-row-resize">
+                <div className="absolute inset-x-0 -top-1 -bottom-1" />
+              </PanelResizeHandle>
+              <Panel defaultSize={initialLayout?.logPanelSize ?? 30} minSize={15} maxSize={60}>
+                <LogViewer
+                  connectionId={connectionId}
+                  logFilePath={logFilePath}
+                  onLogPathChange={handleLogPathChange}
+                  terminalTheme={terminalTheme}
+                />
+              </Panel>
+            </>
+          )}
         </PanelGroup>
       </div>
 
