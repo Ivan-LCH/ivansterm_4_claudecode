@@ -215,7 +215,7 @@ export default function ConnectionModal({ initialData, onSubmit, onSaveAsNew, on
                 Loading...
               </div>
             ) : (
-              entries.map((entry) => (
+              entries.filter((entry) => entry.is_dir).map((entry) => (
                 <div
                   key={entry.path}
                   onClick={() => entry.is_dir && navigateTo(entry.path)}

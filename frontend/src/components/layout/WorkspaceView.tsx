@@ -88,6 +88,11 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
       });
     }, [onTmuxNamesChanged]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // terminals state를 ref로 미러링 (closeTerminal 내 비동기 fetch용)
+    const terminalsRef = useRef<TerminalEntry[]>([
+      { id: `term_${connectionId}_${sessionId.slice(-8)}`, label: "Terminal 1" },
+    ]);
+
     // 초기 마운트 시 tmux 세션 목록 조회 (현재 연결명 prefix 매칭만 필터링)
     useEffect(() => {
       fetch(`/api/connections/${connectionId}/tmux-sessions`)
@@ -111,10 +116,37 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
 
     const handleTmuxSelect = useCallback((sessionName: string) => {
       const resolved = sessionName || generateTmuxName(connectionName);
-      resolveTmuxName(resolved);
+
+      // 서브 세션 (-2, -3 등) 자동 복원: root 세션 이름과 매칭되는 것만
+      const subSessions = tmuxSessions
+        .filter((s) => {
+          const match = s.name.match(/^(.+)-(\d+)$/);
+          return match && match[1] === resolved && parseInt(match[2]) >= 2;
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      if (subSessions.length > 0) {
+        setSelectedTmux(resolved);
+        const allTerminals: TerminalEntry[] = [
+          { id: `term_${connectionId}_${sessionId.slice(-8)}`, label: "Terminal 1", tmuxName: resolved },
+          ...subSessions.map((sub, i) => ({
+            id: `term_${connectionId}_sub${i}_${Date.now()}`,
+            label: `Terminal ${i + 2}`,
+            tmuxName: sub.name,
+          })),
+        ];
+        terminalCounter = allTerminals.length;
+        terminalsRef.current = allTerminals;
+        setTerminals(allTerminals);
+        setActiveTermId(allTerminals[0].id);
+        onTmuxNamesChanged?.(allTerminals.map((t) => t.tmuxName).filter(Boolean) as string[]);
+      } else {
+        resolveTmuxName(resolved);
+      }
+
       setTmuxModalOpen(false);
       setTmuxChecked(true);
-    }, [connectionName, resolveTmuxName]);
+    }, [connectionId, connectionName, sessionId, tmuxSessions, resolveTmuxName, onTmuxNamesChanged]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleTmuxDelete = useCallback((sessionName: string) => {
       fetch(`/api/connections/${connectionId}/tmux-sessions/${encodeURIComponent(sessionName)}`, { method: "DELETE" })
@@ -124,6 +156,8 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
     const [terminals, setTerminals] = useState<TerminalEntry[]>([
       { id: `term_${connectionId}_${sessionId.slice(-8)}`, label: "Terminal 1" },
     ]);
+    // terminals state 변경 시 ref 동기화
+    useEffect(() => { terminalsRef.current = terminals; }, [terminals]);
     const [termViewMode, setTermViewMode] = useState<TerminalViewMode>("tab");
     const [activeTermId, setActiveTermId] = useState<string>(`term_${connectionId}_${sessionId.slice(-8)}`);
     const activeTermIdRef = useRef(activeTermId);
@@ -259,6 +293,17 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
 
   const closeTerminal = useCallback((id: string) => {
     delete termStatusRef.current[id];
+
+    // Terminal 1이 아닌 경우(index > 0) 해당 tmux 세션도 종료
+    const allTerminals = terminalsRef.current;
+    const closingIdx = allTerminals.findIndex((t) => t.id === id);
+    const closingEntry = allTerminals[closingIdx];
+    if (closingEntry?.tmuxName && closingIdx > 0) {
+      fetch(`/api/connections/${connectionId}/tmux-sessions/${encodeURIComponent(closingEntry.tmuxName)}`, {
+        method: "DELETE",
+      }).catch(() => {});
+    }
+
     setTerminals((prev) => {
       if (prev.length <= 1) return prev;
       const newTerms = prev.filter((t) => t.id !== id);
@@ -272,7 +317,7 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
     });
     const anyDisconnected = Object.values(termStatusRef.current).some((d) => d);
     onSessionStatusChange?.(anyDisconnected);
-  }, [activeTermId, onSessionStatusChange]);
+  }, [activeTermId, connectionId, onSessionStatusChange]);
 
   const toggleTermViewMode = () => {
     setTermViewMode((m) => {
@@ -295,9 +340,13 @@ const WorkspaceViewComponent = forwardRef<WorkspaceViewRef, WorkspaceViewProps>(
 
   return (
     <div className="flex-1 flex overflow-hidden relative">
-      {/* tmux 세션 선택 모달 */}
+      {/* tmux 세션 선택 모달: 서브세션(-2, -3 등)은 숨기고 root 세션만 표시 */}
       {tmuxModalOpen && (
-        <TmuxSessionModal sessions={tmuxSessions} onSelect={handleTmuxSelect} onDelete={handleTmuxDelete} />
+        <TmuxSessionModal
+          sessions={tmuxSessions.filter((s) => !/-\d$/.test(s.name))}
+          onSelect={handleTmuxSelect}
+          onDelete={handleTmuxDelete}
+        />
       )}
 
       {/* Web 패널: visible일 때 절대 위치로 전체 덮기 (Editor/Terminal은 mount 유지) */}

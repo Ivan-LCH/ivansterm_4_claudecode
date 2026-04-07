@@ -273,10 +273,10 @@ export default function Sidebar({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-1.5 text-[13px] font-medium text-center transition-colors ${
+            className={`flex-1 py-2 text-[13px] font-medium text-center transition-colors ${
               activeTab === tab
-                ? "text-[#f4f4f5] border-b-2 border-[#3b82f6]"
-                : "text-[#52525b] hover:text-[#a1a1aa]"
+                ? "text-[#f4f4f5] border-b-2 border-[#3b82f6] bg-[#3b82f6]/5"
+                : "text-[#71717a] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/50"
             }`}
           >
             {tab === "sessions" ? "Sessions" : "Servers"}
@@ -291,7 +291,7 @@ export default function Sidebar({
         {activeTab === "sessions" && (
           <div className="flex flex-col h-full">
             {/* 세션 목록 (스크롤) */}
-            <div className="flex-1 overflow-y-auto py-1 min-h-0">
+            <div className="flex-1 overflow-y-auto py-1 min-h-0 overscroll-contain">
               {activeSessions.length === 0 && (
                 <p className="text-[#52525b] text-xs text-center py-4">No active sessions</p>
               )}
@@ -301,12 +301,12 @@ export default function Sidebar({
                 return (
                   <div
                     key={s.sessionId}
-                    className={`relative px-3 py-2 cursor-pointer transition-all ${
+                    className={`relative px-3 py-2.5 cursor-pointer transition-all ${
                       s.disconnected
                         ? "bg-[#ef4444]/10 text-[#ef4444] border-l-[3px] border-[#ef4444]"
                         : isCurrent
-                          ? "bg-[#1e3a5f] text-[#f4f4f5] border-l-[3px] border-[#3b82f6]"
-                          : "text-[#71717a] hover:bg-[#3f3f46]/40 hover:text-[#a1a1aa] border-l-[3px] border-transparent"
+                          ? "bg-[#1e3a5f]/80 text-[#f4f4f5] border-l-[3px] border-[#3b82f6] shadow-[inset_0_0_12px_rgba(59,130,246,0.08)]"
+                          : "text-[#a1a1aa] hover:bg-[#3f3f46]/60 hover:text-[#e4e4e7] hover:border-l-[3px] hover:border-[#3b82f6]/40 border-l-[3px] border-transparent"
                     }`}
                     onClick={() => {
                       if (s.disconnected) {
@@ -345,12 +345,12 @@ export default function Sidebar({
                       </span>
                     </div>
                     {/* host */}
-                    <div className={`text-xs ml-[22px] truncate ${isCurrent ? "text-[#93c5fd]" : "text-[#52525b]"}`}>
+                    <div className={`text-xs ml-[22px] truncate ${isCurrent ? "text-[#93c5fd]" : "text-[#71717a]"}`}>
                       {s.host}
                     </div>
                     {/* workingDir */}
                     <div
-                      className={`text-xs ml-[22px] truncate ${isCurrent ? "text-[#93c5fd]" : "text-[#52525b]"}`}
+                      className={`text-xs ml-[22px] truncate ${isCurrent ? "text-[#93c5fd]" : "text-[#71717a]"}`}
                       title={s.workingDir}
                     >
                       {s.workingDir || "~"}
@@ -389,13 +389,17 @@ export default function Sidebar({
             <div className="border-t border-[#3f3f46] shrink-0">
               <button
                 onClick={() => setFilesExpanded((v) => !v)}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs text-[#a1a1aa] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/50 transition-colors"
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-xs transition-colors ${
+                  filesExpanded
+                    ? "text-[#3b82f6] bg-[#3b82f6]/8 hover:bg-[#3b82f6]/12"
+                    : "text-[#a1a1aa] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/60"
+                }`}
               >
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 font-medium">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   Files
                 </span>
-                <span>{filesExpanded ? "▾" : "▸"}</span>
+                <span className="text-[10px]">{filesExpanded ? "▾" : "▸"}</span>
               </button>
               {filesExpanded && (
                 <div className="flex flex-col" style={{ maxHeight: "280px" }}>
@@ -410,6 +414,11 @@ export default function Sidebar({
                           onFileSelect={(path, filename) => onFileSelect?.(path, filename)}
                           onTailLog={(path) => onTailLog?.(path)}
                           onTransferStatus={onTransferStatus}
+                          onRename={sftp.renameFile}
+                          onDelete={sftp.deleteFile}
+                          onMkdir={sftp.mkdir}
+                          onCreateFile={(path, content) => sftp.writeFile(path, content)}
+                          dirsOnly={false}
                         />
                       </div>
                     </>
@@ -426,13 +435,17 @@ export default function Sidebar({
             <div className="border-t border-[#3f3f46] shrink-0">
               <button
                 onClick={() => setWebExpanded((v) => !v)}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs text-[#a1a1aa] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/50 transition-colors"
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-xs transition-colors ${
+                  webExpanded
+                    ? "text-[#3b82f6] bg-[#3b82f6]/8 hover:bg-[#3b82f6]/12"
+                    : "text-[#a1a1aa] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/60"
+                }`}
               >
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 font-medium">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                   Web Preview
                 </span>
-                <span>{webExpanded ? "▾" : "▸"}</span>
+                <span className="text-[10px]">{webExpanded ? "▾" : "▸"}</span>
               </button>
               {webExpanded && (
                 <div className="flex flex-col">
@@ -466,13 +479,17 @@ export default function Sidebar({
             <div className="border-t border-[#3f3f46] shrink-0">
               <button
                 onClick={() => setClaudeExpanded((v) => !v)}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs text-[#a1a1aa] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/50 transition-colors"
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-xs transition-colors ${
+                  claudeExpanded
+                    ? "text-[#f59e0b] bg-[#f59e0b]/8 hover:bg-[#f59e0b]/12"
+                    : "text-[#a1a1aa] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/60"
+                }`}
               >
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 font-medium">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                   Claude
                 </span>
-                <span>{claudeExpanded ? "▾" : "▸"}</span>
+                <span className="text-[10px]">{claudeExpanded ? "▾" : "▸"}</span>
               </button>
               {claudeExpanded && (
                 <div className="flex flex-col">
@@ -554,36 +571,40 @@ export default function Sidebar({
 
         {/* Servers 탭 */}
         {activeTab === "servers" && (
-          <div className="py-1 overflow-y-auto h-full">
+          <div className="py-1 overflow-y-auto h-full overscroll-contain">
             {savedConnections.map((conn) => {
               const isActive = activeSessions.some((s) => s.connectionId === conn.id);
               return (
                 <div
                   key={conn.id}
-                  className="px-3 py-2 hover:bg-[#3f3f46]/50 transition-colors group"
+                  className={`px-3 py-2.5 transition-colors group border-l-[3px] ${
+                    isActive
+                      ? "border-[#10b981] bg-[#10b981]/5 hover:bg-[#10b981]/10"
+                      : "border-transparent hover:bg-[#3f3f46]/60 hover:border-[#3f3f46]"
+                  }`}
                 >
                   <div
                     className="cursor-pointer"
                     onClick={() => onEditConnection(conn)}
                   >
-                    <div className="text-[13px] font-medium text-[#a1a1aa] flex items-center gap-1.5">
+                    <div className={`text-[13px] font-medium flex items-center gap-1.5 ${isActive ? "text-[#e4e4e7]" : "text-[#a1a1aa]"}`}>
                       {conn.name}
                       {isActive && (
-                        <span className="text-[9px] font-semibold text-[#3b82f6] bg-[#1e3a5f] px-1 py-0.5 rounded shrink-0 leading-none">
+                        <span className="text-[9px] font-semibold text-[#10b981] bg-[#10b981]/15 px-1.5 py-0.5 rounded shrink-0 leading-none border border-[#10b981]/30">
                           open
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-[#71717a] truncate">
+                    <div className="text-xs text-[#71717a] truncate mt-0.5">
                       {conn.username}@{conn.host}:{conn.port}
                     </div>
                     {conn.last_working_dir && conn.last_working_dir !== "~" && (
-                      <div className="text-xs text-[#71717a] truncate">{conn.last_working_dir}</div>
+                      <div className="text-xs text-[#52525b] truncate">{conn.last_working_dir}</div>
                     )}
                   </div>
                   <button
                     onClick={() => onDeleteConnection(conn.id)}
-                    className="text-xs text-[#71717a] hover:text-[#ef4444] hover:bg-[#ef4444]/10 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-all mt-0.5"
+                    className="text-[11px] text-[#52525b] hover:text-[#ef4444] hover:bg-[#ef4444]/10 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-all mt-1"
                   >
                     delete
                   </button>
@@ -592,7 +613,7 @@ export default function Sidebar({
             })}
             <button
               onClick={onAddConnection}
-              className="w-full px-3 py-2.5 text-xs font-medium text-[#71717a] hover:text-[#3b82f6] hover:bg-[#3f3f46]/50 text-center transition-colors"
+              className="w-full px-3 py-3 text-xs font-medium text-[#3b82f6] hover:text-[#60a5fa] hover:bg-[#3b82f6]/10 text-center transition-colors border-t border-[#3f3f46] mt-1"
             >
               + Add Server
             </button>
@@ -604,7 +625,7 @@ export default function Sidebar({
       <div className="border-t border-[#3f3f46] shrink-0">
         <button
           onClick={onOpenSettings}
-          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-[#71717a] hover:text-[#3b82f6] hover:bg-[#3f3f46]/50 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-3 text-xs font-medium text-[#a1a1aa] hover:text-[#3b82f6] hover:bg-[#3f3f46]/60 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Settings

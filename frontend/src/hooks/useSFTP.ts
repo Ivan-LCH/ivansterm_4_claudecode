@@ -83,5 +83,20 @@ export function useSFTP(connectionId: number) {
     [connectionId]
   );
 
-  return { listDirectory, readFile, writeFile, mkdir, deleteFile };
+  const renameFile = useCallback(
+    async (oldPath: string, newPath: string): Promise<void> => {
+      const res = await fetch("/api/files/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conn_id: connectionId, old_path: oldPath, new_path: newPath }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || "Failed to rename");
+      }
+    },
+    [connectionId]
+  );
+
+  return { listDirectory, readFile, writeFile, mkdir, deleteFile, renameFile };
 }

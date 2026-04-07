@@ -11,3 +11,35 @@ body {
 /* xterm.js 내장 스크롤바 숨김 (커스텀 오버레이 스크롤바로 대체) */
 .xterm-viewport::-webkit-scrollbar { display: none; }
 .xterm-viewport { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* 커스텀 스크롤바 (다크 테마) */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #71717a;
+}
+
+/* 스크롤 가능 영역 — 모바일 터치 스크롤 최적화 */
+.overflow-y-auto,
+.overflow-y-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* 모바일: 패널 리사이저 터치 편의 */
+@media (hover: none) and (pointer: coarse) {
+  /* 터치 디바이스에서 패널 드래그 핸들 두껍게 */
+  [data-panel-resize-handle-id] {
+    min-width: 8px !important;
+    min-height: 8px !important;
+  }
+}

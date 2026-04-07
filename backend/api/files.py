@@ -23,6 +23,12 @@ class MkdirRequest(BaseModel):
     path: str
 
 
+class RenameRequest(BaseModel):
+    conn_id: int
+    old_path: str
+    new_path: str
+
+
 async def _get_sftp(conn: Connection):
     """Connection 모델로부터 SFTP 클라이언트 생성"""
     kwargs = {
@@ -167,6 +173,29 @@ async def mkdir(
     try:
         ssh_conn, sftp = await _get_sftp(conn)
         await sftp.mkdir(data.path)
+        return {"status": "ok"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SFTP error: {str(e)}")
+    finally:
+        if ssh_conn:
+            ssh_conn.close()
+
+
+@router.post("/rename")
+async def rename_file(
+    data: RenameRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """원격 파일/폴더 이름 변경 또는 이동"""
+    conn = await db.get(Connection, data.conn_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    ssh_conn = None
+    try:
+        ssh_conn, sftp = await _get_sftp(conn)
+        await sftp.rename(data.old_path, data.new_path)
         return {"status": "ok"}
 
     except Exception as e:
