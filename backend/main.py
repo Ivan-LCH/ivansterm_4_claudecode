@@ -18,6 +18,7 @@ from backend.api.files import router as files_router
 from backend.api.logtail import router as logtail_router
 from backend.api.workspace import router as workspace_router
 from backend.api.transfer import router as transfer_router
+from backend.api.git import router as git_router
 
 
 async def _migrate_db():
@@ -59,6 +60,7 @@ app.include_router(files_router)
 app.include_router(logtail_router)
 app.include_router(workspace_router)
 app.include_router(transfer_router)
+app.include_router(git_router)
 
 
 # 헬스체크

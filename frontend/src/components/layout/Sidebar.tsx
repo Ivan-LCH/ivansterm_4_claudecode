@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import type { ConnectionInfo, TransferStatus } from "../../types";
 import FileTree from "../editor/FileTree";
 import { useSFTP } from "../../hooks/useSFTP";
+import GitPanel from "../git/GitPanel";
 
 interface ActiveSession {
   sessionId: string;
@@ -86,15 +87,15 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="bg-[#1c1c1f] border border-[#3f3f46] rounded-lg shadow-2xl w-[400px] max-h-[80vh] flex flex-col overflow-hidden"
+        className="bg-[#1e2030] border border-[#2e3255] rounded-lg shadow-2xl w-[400px] max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#3f3f46] shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#2e3255] shrink-0">
           <span className="text-sm font-semibold text-[#f4f4f5]">⌨️ 단축키 안내</span>
           <button
             onClick={onClose}
-            className="text-[#71717a] hover:text-[#f4f4f5] transition-colors text-lg leading-none"
+            className="text-[#8b92b8] hover:text-[#f4f4f5] transition-colors text-lg leading-none"
           >
             ×
           </button>
@@ -114,13 +115,13 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
                         {s.keys.map((k) => (
                           <kbd
                             key={k}
-                            className="inline-block px-1.5 py-0.5 mr-1 bg-[#27272a] border border-[#52525b] rounded text-[10px] text-[#e4e4e7] font-mono"
+                            className="inline-block px-1.5 py-0.5 mr-1 bg-[#252840] border border-[#52525b] rounded text-[10px] text-[#e4e4e7] font-mono"
                           >
                             {k}
                           </kbd>
                         ))}
                       </td>
-                      <td className="py-1.5 text-[#a1a1aa]">{s.desc}</td>
+                      <td className="py-1.5 text-[#b0b8d8]">{s.desc}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -128,10 +129,10 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
-        <div className="px-4 py-2 border-t border-[#3f3f46] shrink-0">
+        <div className="px-4 py-2 border-t border-[#2e3255] shrink-0">
           <button
             onClick={onClose}
-            className="w-full py-1.5 text-xs bg-[#3f3f46] text-[#a1a1aa] rounded hover:bg-[#52525b] transition-colors"
+            className="w-full py-1.5 text-xs bg-[#2e3255] text-[#b0b8d8] rounded hover:bg-[#3a4070] transition-colors"
           >
             닫기
           </button>
@@ -144,11 +145,11 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
 // 세션 컨텍스트 헤더 (Files / Web Preview expander 공통)
 function SessionContextHeader({ session }: { session: ActiveSession }) {
   return (
-    <div className="px-3 py-1.5 bg-[#27272a] border-b border-[#3f3f46] shrink-0">
+    <div className="px-3 py-1.5 bg-[#252840] border-b border-[#2e3255] shrink-0">
       <div className="text-[10px] truncate" title={`${session.name} @ ${session.workingDir}`}>
         <span className="text-[#93c5fd] font-medium">{session.name}</span>
-        <span className="text-[#52525b]"> @ </span>
-        <span className="text-[#71717a]">{session.workingDir || "~"}</span>
+        <span className="text-[#6b7299]"> @ </span>
+        <span className="text-[#8b92b8]">{session.workingDir || "~"}</span>
       </div>
     </div>
   );
@@ -178,6 +179,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<TabType>(activeSessions.length > 0 ? "sessions" : "servers");
   const [filesExpanded, setFilesExpanded] = useState(false);
+  const [gitExpanded, setGitExpanded] = useState(false);
   const [webExpanded, setWebExpanded] = useState(false);
   const [claudeExpanded, setClaudeExpanded] = useState(false);
   const [claudeCommand, setClaudeCommand] = useState("");
@@ -225,17 +227,17 @@ export default function Sidebar({
 
   if (collapsed) {
     return (
-      <div className="w-full h-full bg-[#18181b] flex flex-col items-center py-2 overflow-hidden">
+      <div className="w-full h-full bg-[#1e2030] flex flex-col items-center py-2 overflow-hidden">
         <button
           onClick={onToggle}
-          className="text-[#a1a1aa] hover:text-[#3b82f6] text-lg mb-4"
+          className="text-[#b0b8d8] hover:text-[#3b82f6] text-lg mb-4"
           title="Expand sidebar"
         >
           &raquo;
         </button>
         <button
           onClick={() => { onToggle(); setActiveTab("sessions"); }}
-          className="text-xs text-[#52525b] hover:text-[#3b82f6] mt-2 transition-colors"
+          className="text-xs text-[#6b7299] hover:text-[#3b82f6] mt-2 transition-colors"
           title="Sessions"
         >
           {activeSessions.length}
@@ -243,7 +245,7 @@ export default function Sidebar({
         {/* Settings 버튼 (하단 고정) */}
         <button
           onClick={onOpenSettings}
-          className="mt-auto text-[#52525b] hover:text-[#3b82f6] transition-colors"
+          className="mt-auto text-[#6b7299] hover:text-[#3b82f6] transition-colors"
           title="Settings"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -253,14 +255,14 @@ export default function Sidebar({
   }
 
   return (
-    <div className="w-full h-full bg-[#18181b] flex flex-col overflow-hidden">
+    <div className="w-full h-full bg-[#1e2030] flex flex-col overflow-hidden">
       {shortcutsOpen && <ShortcutsModal onClose={() => setShortcutsOpen(false)} />}
       {/* 헤더 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#3f3f46]">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#2e3255]">
         <span className="text-[#3b82f6] font-bold text-sm">IvansTerm</span>
         <button
           onClick={onToggle}
-          className="text-[#a1a1aa] hover:text-[#3b82f6] text-sm"
+          className="text-[#b0b8d8] hover:text-[#3b82f6] text-sm"
           title="Collapse sidebar"
         >
           &laquo;
@@ -268,7 +270,7 @@ export default function Sidebar({
       </div>
 
       {/* 탭 전환: Sess | Svrs */}
-      <div className="flex border-b border-[#3f3f46]">
+      <div className="flex border-b border-[#2e3255]">
         {(["sessions", "servers"] as const).map((tab) => (
           <button
             key={tab}
@@ -276,7 +278,7 @@ export default function Sidebar({
             className={`flex-1 py-2 text-[13px] font-medium text-center transition-colors ${
               activeTab === tab
                 ? "text-[#f4f4f5] border-b-2 border-[#3b82f6] bg-[#3b82f6]/5"
-                : "text-[#71717a] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/50"
+                : "text-[#8b92b8] hover:text-[#e4e4e7] hover:bg-[#2e3255]/70"
             }`}
           >
             {tab === "sessions" ? "Sessions" : "Servers"}
@@ -291,9 +293,9 @@ export default function Sidebar({
         {activeTab === "sessions" && (
           <div className="flex flex-col h-full">
             {/* 세션 목록 (스크롤) */}
-            <div className="flex-1 overflow-y-auto py-1 min-h-0 overscroll-contain">
+            <div className="flex-1 overflow-y-auto py-1 min-h-0 touch-scroll">
               {activeSessions.length === 0 && (
-                <p className="text-[#52525b] text-xs text-center py-4">No active sessions</p>
+                <p className="text-[#6b7299] text-xs text-center py-4">No active sessions</p>
               )}
               {activeSessions.map((s) => {
                 const isCurrent = s.sessionId === currentSessionId;
@@ -306,7 +308,7 @@ export default function Sidebar({
                         ? "bg-[#ef4444]/10 text-[#ef4444] border-l-[3px] border-[#ef4444]"
                         : isCurrent
                           ? "bg-[#1e3a5f]/80 text-[#f4f4f5] border-l-[3px] border-[#3b82f6] shadow-[inset_0_0_12px_rgba(59,130,246,0.08)]"
-                          : "text-[#a1a1aa] hover:bg-[#3f3f46]/60 hover:text-[#e4e4e7] hover:border-l-[3px] hover:border-[#3b82f6]/40 border-l-[3px] border-transparent"
+                          : "text-[#b0b8d8] hover:bg-[#2e3255]/80 hover:text-[#e4e4e7] hover:border-l-[3px] hover:border-[#3b82f6]/40 border-l-[3px] border-transparent"
                     }`}
                     onClick={() => {
                       if (s.disconnected) {
@@ -337,7 +339,7 @@ export default function Sidebar({
                         )}
                         <button
                           onClick={(e) => { e.stopPropagation(); onCloseSession(s.sessionId); }}
-                          className="text-base text-[#71717a] hover:text-[#ef4444] hover:bg-[#ef4444]/10 rounded px-1 transition-colors leading-none"
+                          className="text-base text-[#8b92b8] hover:text-[#ef4444] hover:bg-[#ef4444]/10 rounded px-1 transition-colors leading-none"
                           title="Close session"
                         >
                           ×
@@ -345,12 +347,12 @@ export default function Sidebar({
                       </span>
                     </div>
                     {/* host */}
-                    <div className={`text-xs ml-[22px] truncate ${isCurrent ? "text-[#93c5fd]" : "text-[#71717a]"}`}>
+                    <div className={`text-xs ml-[22px] truncate ${isCurrent ? "text-[#93c5fd]" : "text-[#8b92b8]"}`}>
                       {s.host}
                     </div>
                     {/* workingDir */}
                     <div
-                      className={`text-xs ml-[22px] truncate ${isCurrent ? "text-[#93c5fd]" : "text-[#71717a]"}`}
+                      className={`text-xs ml-[22px] truncate ${isCurrent ? "text-[#93c5fd]" : "text-[#8b92b8]"}`}
                       title={s.workingDir}
                     >
                       {s.workingDir || "~"}
@@ -358,7 +360,7 @@ export default function Sidebar({
                     {/* 미니 터미널 프리뷰 */}
                     {terminalPreviews[s.sessionId] && terminalPreviews[s.sessionId].length > 0 && (
                       <div
-                        className="mt-1 mx-1 rounded overflow-hidden bg-[#27272a] border border-[#3f3f46]/50"
+                        className="mt-1 mx-1 rounded overflow-hidden bg-[#252840] border border-[#2e3255]/50"
                         style={{ height: "44px" }}
                       >
                         <pre
@@ -375,10 +377,10 @@ export default function Sidebar({
             </div>
 
             {/* 단축키 안내 버튼 */}
-            <div className="border-t border-[#3f3f46] shrink-0">
+            <div className="border-t border-[#2e3255] shrink-0">
               <button
                 onClick={() => setShortcutsOpen(true)}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] text-[#fbbf24] hover:text-[#fde68a] hover:bg-[#3f3f46]/50 transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] text-[#fbbf24] hover:text-[#fde68a] hover:bg-[#2e3255]/70 transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"/></svg>
                 단축키 안내!
@@ -386,14 +388,13 @@ export default function Sidebar({
             </div>
 
             {/* Files expander */}
-            <div className="border-t border-[#3f3f46] shrink-0">
+            <div className="border-t border-[#2e3255] shrink-0">
               <button
                 onClick={() => setFilesExpanded((v) => !v)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 text-xs transition-colors ${
-                  filesExpanded
-                    ? "text-[#3b82f6] bg-[#3b82f6]/8 hover:bg-[#3b82f6]/12"
-                    : "text-[#a1a1aa] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/60"
+                  filesExpanded ? "text-[#3b82f6]" : "text-[#b0b8d8] hover:text-[#e4e4e7]"
                 }`}
+                style={filesExpanded ? { backgroundColor: "rgba(59,130,246,0.13)" } : undefined}
               >
                 <span className="flex items-center gap-1.5 font-medium">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
@@ -406,7 +407,7 @@ export default function Sidebar({
                   {currentSession && !currentSession.disconnected ? (
                     <>
                       <SessionContextHeader session={currentSession} />
-                      <div className="overflow-y-auto flex-1">
+                      <div className="overflow-y-auto flex-1 min-h-0 touch-scroll">
                         <FileTree
                           connectionId={currentSession.connectionId}
                           rootPath={currentSession.workingDir}
@@ -423,7 +424,41 @@ export default function Sidebar({
                       </div>
                     </>
                   ) : (
-                    <p className="text-[#52525b] text-xs text-center py-3">
+                    <p className="text-[#6b7299] text-xs text-center py-3">
+                      {activeSessions.length === 0 ? "No active sessions" : "Session disconnected"}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Git expander */}
+            <div className="border-t border-[#2e3255] shrink-0">
+              <button
+                onClick={() => setGitExpanded((v) => !v)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-xs transition-colors ${
+                  gitExpanded ? "text-[#f97316]" : "text-[#b0b8d8] hover:text-[#e4e4e7]"
+                }`}
+                style={gitExpanded ? { backgroundColor: "rgba(249,115,22,0.13)" } : undefined}
+              >
+                <span className="flex items-center gap-1.5 font-medium">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+                  Source Control
+                </span>
+                <span className="text-[10px]">{gitExpanded ? "▾" : "▸"}</span>
+              </button>
+              {gitExpanded && (
+                <div>
+                  {currentSession && !currentSession.disconnected ? (
+                    <>
+                      <SessionContextHeader session={currentSession} />
+                      <GitPanel
+                        connectionId={currentSession.connectionId}
+                        workingDir={currentSession.workingDir}
+                      />
+                    </>
+                  ) : (
+                    <p className="text-[#6b7299] text-xs text-center py-3">
                       {activeSessions.length === 0 ? "No active sessions" : "Session disconnected"}
                     </p>
                   )}
@@ -432,14 +467,13 @@ export default function Sidebar({
             </div>
 
             {/* Web Preview expander */}
-            <div className="border-t border-[#3f3f46] shrink-0">
+            <div className="border-t border-[#2e3255] shrink-0">
               <button
                 onClick={() => setWebExpanded((v) => !v)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 text-xs transition-colors ${
-                  webExpanded
-                    ? "text-[#3b82f6] bg-[#3b82f6]/8 hover:bg-[#3b82f6]/12"
-                    : "text-[#a1a1aa] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/60"
+                  webExpanded ? "text-[#3b82f6]" : "text-[#b0b8d8] hover:text-[#e4e4e7]"
                 }`}
+                style={webExpanded ? { backgroundColor: "rgba(59,130,246,0.13)" } : undefined}
               >
                 <span className="flex items-center gap-1.5 font-medium">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -462,7 +496,7 @@ export default function Sidebar({
                       }}
                       onKeyDown={(e) => { if (e.key === "Enter") handleWebOpen(); }}
                       placeholder="http://localhost:3000"
-                      className="w-full px-2 py-1.5 text-xs bg-[#27272a] border border-[#3f3f46] rounded text-[#f4f4f5] placeholder-[#52525b] focus:outline-none focus:border-[#3b82f6]"
+                      className="w-full px-2 py-1.5 text-xs bg-[#252840] border border-[#2e3255] rounded text-[#f4f4f5] placeholder-[#52525b] focus:outline-none focus:border-[#3b82f6]"
                     />
                     <button
                       onClick={handleWebOpen}
@@ -476,14 +510,13 @@ export default function Sidebar({
             </div>
 
             {/* Claude expander */}
-            <div className="border-t border-[#3f3f46] shrink-0">
+            <div className="border-t border-[#2e3255] shrink-0">
               <button
                 onClick={() => setClaudeExpanded((v) => !v)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 text-xs transition-colors ${
-                  claudeExpanded
-                    ? "text-[#f59e0b] bg-[#f59e0b]/8 hover:bg-[#f59e0b]/12"
-                    : "text-[#a1a1aa] hover:text-[#e4e4e7] hover:bg-[#3f3f46]/60"
+                  claudeExpanded ? "text-[#f59e0b]" : "text-[#b0b8d8] hover:text-[#e4e4e7]"
                 }`}
+                style={claudeExpanded ? { backgroundColor: "rgba(245,158,11,0.13)" } : undefined}
               >
                 <span className="flex items-center gap-1.5 font-medium">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -511,7 +544,7 @@ export default function Sidebar({
                               setClaudeCommand("");
                             }
                           }}
-                          className="text-[9px] px-2 py-1 bg-[#27272a] text-[#93c5fd] border border-[#3b82f6] rounded hover:bg-[#3b82f6] hover:text-white transition-colors"
+                          className="text-[9px] px-2 py-1 bg-[#252840] text-[#93c5fd] border border-[#3b82f6] rounded hover:bg-[#3b82f6] hover:text-white transition-colors"
                           title={preset.cmd}
                         >
                           {preset.label}
@@ -526,7 +559,7 @@ export default function Sidebar({
                           }
                         }}
                         disabled={!currentSession || currentSession.disconnected}
-                        className="text-[9px] px-2 py-1 bg-[#27272a] text-[#f87171] border border-[#ef4444] rounded hover:bg-[#ef4444] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="text-[9px] px-2 py-1 bg-[#252840] text-[#f87171] border border-[#ef4444] rounded hover:bg-[#ef4444] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         title="ESC 키 전송"
                       >
                         ESC
@@ -545,7 +578,7 @@ export default function Sidebar({
                         }
                       }}
                       placeholder="명령어 입력"
-                      className="w-full px-2 py-1.5 text-xs bg-[#27272a] border border-[#3f3f46] rounded text-[#f4f4f5] placeholder-[#52525b] focus:outline-none focus:border-[#3b82f6]"
+                      className="w-full px-2 py-1.5 text-xs bg-[#252840] border border-[#2e3255] rounded text-[#f4f4f5] placeholder-[#52525b] focus:outline-none focus:border-[#3b82f6]"
                       disabled={!currentSession || currentSession.disconnected}
                     />
                     {/* Send 버튼 */}
@@ -571,7 +604,7 @@ export default function Sidebar({
 
         {/* Servers 탭 */}
         {activeTab === "servers" && (
-          <div className="py-1 overflow-y-auto h-full overscroll-contain">
+          <div className="py-1 overflow-y-auto h-full touch-scroll">
             {savedConnections.map((conn) => {
               const isActive = activeSessions.some((s) => s.connectionId === conn.id);
               return (
@@ -579,32 +612,33 @@ export default function Sidebar({
                   key={conn.id}
                   className={`px-3 py-2.5 transition-colors group border-l-[3px] ${
                     isActive
-                      ? "border-[#10b981] bg-[#10b981]/5 hover:bg-[#10b981]/10"
-                      : "border-transparent hover:bg-[#3f3f46]/60 hover:border-[#3f3f46]"
+                      ? "border-[#10b981] hover:brightness-110"
+                      : "border-transparent hover:bg-[#2e3255]/80 hover:border-[#2e3255]"
                   }`}
+                  style={isActive ? { backgroundColor: "rgba(16,185,129,0.09)" } : undefined}
                 >
                   <div
                     className="cursor-pointer"
                     onClick={() => onEditConnection(conn)}
                   >
-                    <div className={`text-[13px] font-medium flex items-center gap-1.5 ${isActive ? "text-[#e4e4e7]" : "text-[#a1a1aa]"}`}>
+                    <div className={`text-[13px] font-medium flex items-center gap-1.5 ${isActive ? "text-[#e4e4e7]" : "text-[#b0b8d8]"}`}>
                       {conn.name}
                       {isActive && (
-                        <span className="text-[9px] font-semibold text-[#10b981] bg-[#10b981]/15 px-1.5 py-0.5 rounded shrink-0 leading-none border border-[#10b981]/30">
+                        <span className="text-[9px] font-semibold text-[#10b981] px-1.5 py-0.5 rounded shrink-0 leading-none border border-[#10b981]" style={{ backgroundColor: "rgba(16,185,129,0.18)" }}>
                           open
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-[#71717a] truncate mt-0.5">
+                    <div className="text-xs text-[#8b92b8] truncate mt-0.5">
                       {conn.username}@{conn.host}:{conn.port}
                     </div>
                     {conn.last_working_dir && conn.last_working_dir !== "~" && (
-                      <div className="text-xs text-[#52525b] truncate">{conn.last_working_dir}</div>
+                      <div className="text-xs text-[#6b7299] truncate">{conn.last_working_dir}</div>
                     )}
                   </div>
                   <button
                     onClick={() => onDeleteConnection(conn.id)}
-                    className="text-[11px] text-[#52525b] hover:text-[#ef4444] hover:bg-[#ef4444]/10 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-all mt-1"
+                    className="text-[11px] text-[#6b7299] hover:text-[#ef4444] hover:bg-[#ef4444]/10 rounded px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-all mt-1"
                   >
                     delete
                   </button>
@@ -613,7 +647,7 @@ export default function Sidebar({
             })}
             <button
               onClick={onAddConnection}
-              className="w-full px-3 py-3 text-xs font-medium text-[#3b82f6] hover:text-[#60a5fa] hover:bg-[#3b82f6]/10 text-center transition-colors border-t border-[#3f3f46] mt-1"
+              className="w-full px-3 py-3 text-xs font-medium text-[#3b82f6] hover:text-[#60a5fa] hover:bg-[#3b82f6]/10 text-center transition-colors border-t border-[#2e3255] mt-1"
             >
               + Add Server
             </button>
@@ -622,10 +656,10 @@ export default function Sidebar({
       </div>
 
       {/* 하단 Settings 버튼 */}
-      <div className="border-t border-[#3f3f46] shrink-0">
+      <div className="border-t border-[#2e3255] shrink-0">
         <button
           onClick={onOpenSettings}
-          className="w-full flex items-center gap-2 px-3 py-3 text-xs font-medium text-[#a1a1aa] hover:text-[#3b82f6] hover:bg-[#3f3f46]/60 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-3 text-xs font-medium text-[#b0b8d8] hover:text-[#3b82f6] hover:bg-[#2e3255]/80 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Settings

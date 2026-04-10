@@ -122,56 +122,100 @@ const TerminalPanel = forwardRef<TerminalPanelRef, TerminalPanelProps>(
       }
     }, [containerRef]);
 
-    // ── 스크롤바 드래그 핸들러 ──────────────────────────────────────────────
-    // Normal buffer: terminal.scrollToLine()으로 xterm 직접 이동 (정확한 동기화)
-    // Alt buffer (tmux): thumb가 마우스를 따라가고, 비례적 wheel 이벤트 발송
-    const handleTrackMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
+    // ── 스크롤바 드래그 공통 로직 (마우스/터치 공용) ────────────────────────
+    const startTrackDrag = useCallback((startClientY: number) => {
       if (!trackRef.current) return;
-
-      const startY = e.clientY;
       const trackH = trackRef.current.clientHeight;
       const isAlt = isAltBufferRef.current;
-      // 드래그 시작 시점의 thumb 상태 캡처
       const startThumbTop = thumbTop;
       const startThumbRatio = thumbRatio;
-      let lastClientY = startY;
+      let lastClientY = startClientY;
 
-      const onMove = (me: MouseEvent) => {
-        const dragPx = me.clientY - startY; // positive = 아래로
-
+      const onDragMove = (clientY: number) => {
+        const dragPx = clientY - startClientY;
         if (isAlt) {
-          // ── Alt buffer (tmux): wheel 이벤트 발송 → tmux가 처리 → 인디케이터 업데이트 ──
-          const incDelta = me.clientY - lastClientY;
+          const incDelta = clientY - lastClientY;
           if (Math.abs(incDelta) >= 3) {
             const wheelCount = Math.max(1, Math.round(Math.abs(incDelta) / 3));
             dispatchWheelScroll(incDelta > 0 ? -wheelCount : wheelCount);
-            lastClientY = me.clientY;
+            lastClientY = clientY;
           }
         } else {
-          // ── Normal buffer: xterm 스크롤 위치 직접 설정 (정확한 동기화) ──
           const terminal = terminalRef.current;
           if (!terminal) return;
           const total = terminal.buffer.active.length;
           const rows = terminal.rows;
           const maxScroll = Math.max(1, total - rows);
           const maxTop = Math.max(0.01, 1 - startThumbRatio);
-
           const newTop = Math.max(0, Math.min(maxTop, startThumbTop + dragPx / trackH));
           const newViewportY = Math.round((newTop / maxTop) * maxScroll);
           terminal.scrollToLine(newViewportY);
-          // onScroll 콜백이 thumb 위치를 자동 업데이트
         }
       };
+      return onDragMove;
+    }, [dispatchWheelScroll, thumbTop, thumbRatio, terminalRef]);
 
+    // 마우스 드래그
+    const handleTrackMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const onMove = startTrackDrag(e.clientY);
+      if (!onMove) return;
+      const onMouseMove = (me: MouseEvent) => onMove(me.clientY);
       const onUp = () => {
-        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onUp);
       };
-      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onUp);
-    }, [dispatchWheelScroll, thumbTop, thumbRatio, terminalRef]);
+    }, [startTrackDrag]);
+
+    // 터치 드래그 (모바일 스크롤바)
+    const handleTrackTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      const onMove = startTrackDrag(e.touches[0].clientY);
+      if (!onMove) return;
+      const onTouchMove = (te: TouchEvent) => {
+        te.preventDefault();
+        onMove(te.touches[0].clientY);
+      };
+      const onTouchEnd = () => {
+        window.removeEventListener('touchmove', onTouchMove);
+        window.removeEventListener('touchend', onTouchEnd);
+      };
+      window.addEventListener('touchmove', onTouchMove, { passive: false });
+      window.addEventListener('touchend', onTouchEnd);
+    }, [startTrackDrag]);
+
+    // ── 터미널 영역 터치 → 스크롤 변환 ────────────────────────────────────
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      let lastTouchY = 0;
+      const onTouchStart = (e: TouchEvent) => {
+        lastTouchY = e.touches[0].clientY;
+      };
+      const onTouchMove = (e: TouchEvent) => {
+        const y = e.touches[0].clientY;
+        const delta = lastTouchY - y; // 양수: 위로 스와이프(출력 위로 스크롤)
+        lastTouchY = y;
+        if (Math.abs(delta) < 3) return;
+        const lines = Math.max(1, Math.round(Math.abs(delta) / 8));
+        if (!isAltBufferRef.current) {
+          // Normal buffer: xterm scrollLines() 직접 호출
+          terminalRef.current?.scrollLines(delta > 0 ? lines : -lines);
+        } else {
+          // Alt buffer (tmux): wheel 이벤트로 tmux에 전달
+          dispatchWheelScroll(delta > 0 ? lines : -lines);
+        }
+      };
+      container.addEventListener('touchstart', onTouchStart, { passive: true });
+      container.addEventListener('touchmove', onTouchMove, { passive: true });
+      return () => {
+        container.removeEventListener('touchstart', onTouchStart);
+        container.removeEventListener('touchmove', onTouchMove);
+      };
+    }, [containerRef, dispatchWheelScroll, terminalRef]);
 
     // ── reconnectSignal 처리 ────────────────────────────────────────────────
     const prevSignalRef = useRef(reconnectSignal);
@@ -199,6 +243,15 @@ const TerminalPanel = forwardRef<TerminalPanelRef, TerminalPanelProps>(
 
     const p = settings.padding;
 
+    const scrollTerminal = (dir: "up" | "down") => {
+      const lines = 3;
+      if (!isAltBufferRef.current) {
+        terminalRef.current?.scrollLines(dir === "up" ? -lines : lines);
+      } else {
+        dispatchWheelScroll(dir === "up" ? lines : -lines);
+      }
+    };
+
     return (
       <div
         className="absolute inset-0"
@@ -217,11 +270,64 @@ const TerminalPanel = forwardRef<TerminalPanelRef, TerminalPanelProps>(
           <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
         </div>
 
+        {/* 모바일 스크롤 버튼 (▲▼) */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: p + 4,
+            left: p + 4,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            zIndex: 10,
+          }}
+        >
+          <button
+            onPointerDown={(e) => { e.preventDefault(); scrollTerminal("up"); }}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 6,
+              background: "rgba(255,255,255,0.10)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "#ccc",
+              fontSize: 14,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              userSelect: "none",
+              WebkitUserSelect: "none",
+            }}
+            title="Scroll up"
+          >▲</button>
+          <button
+            onPointerDown={(e) => { e.preventDefault(); scrollTerminal("down"); }}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 6,
+              background: "rgba(255,255,255,0.10)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "#ccc",
+              fontSize: 14,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              userSelect: "none",
+              WebkitUserSelect: "none",
+            }}
+            title="Scroll down"
+          >▼</button>
+        </div>
+
         {/* 커스텀 스크롤바 트랙 */}
         <div
           ref={trackRef}
           onMouseDown={handleTrackMouseDown}
-          title="스크롤 (드래그)"
+          onTouchStart={handleTrackTouchStart}
+          title="스크롤 (드래그/스와이프)"
           style={{
             position: "absolute",
             top: p,

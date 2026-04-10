@@ -427,7 +427,12 @@ export default function FileTree({
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
+
+  const scrollList = (dir: "up" | "down") => {
+    listRef.current?.scrollBy({ top: dir === "up" ? -120 : 120, behavior: "smooth" });
+  };
 
   const onPathResolvedRef = useRef(onPathResolved);
   useEffect(() => { onPathResolvedRef.current = onPathResolved; }, [onPathResolved]);
@@ -633,8 +638,10 @@ export default function FileTree({
         </div>
       )}
 
-      {/* 파일 목록 */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-1 overscroll-contain">
+      {/* 파일 목록 + 오버레이 스크롤 버튼 */}
+      <div className="flex-1 min-h-0 relative">
+        <div ref={listRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden py-1 touch-scroll pr-7">
+
         {loading && rootNodes.length === 0 && (
           <div className="text-xs text-[#52525b] text-center py-4">Loading...</div>
         )}
@@ -662,6 +669,55 @@ export default function FileTree({
             dirsOnly={dirsOnly}
           />
         ))}
+        </div>
+        {/* 오버레이 스크롤 버튼 (모바일 터치용) */}
+        <div style={{
+          position: "absolute",
+          right: 2,
+          top: "50%",
+          transform: "translateY(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          zIndex: 20,
+        }}>
+          <button
+            onPointerDown={(e) => { e.preventDefault(); scrollList("up"); }}
+            style={{
+              width: 24,
+              height: 28,
+              borderRadius: 4,
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: "#aaa",
+              fontSize: 10,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              userSelect: "none",
+            }}
+            title="Scroll up"
+          >▲</button>
+          <button
+            onPointerDown={(e) => { e.preventDefault(); scrollList("down"); }}
+            style={{
+              width: 24,
+              height: 28,
+              borderRadius: 4,
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: "#aaa",
+              fontSize: 10,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              userSelect: "none",
+            }}
+            title="Scroll down"
+          >▼</button>
+        </div>
       </div>
 
       {/* 로컬 파일 Drag & Drop 오버레이 */}
