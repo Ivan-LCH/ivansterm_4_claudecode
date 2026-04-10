@@ -19,7 +19,6 @@ interface SidebarProps {
   activeSessions: ActiveSession[];
   savedConnections: ConnectionInfo[];
   currentSessionId: string | null;
-  terminalPreviews: Record<string, string[]>;
   sessionNotifications?: Record<string, number>;
   activeTerminalIds?: Record<string, string>;
   onSelectSession: (sessionId: string) => void;
@@ -161,7 +160,6 @@ export default function Sidebar({
   activeSessions,
   savedConnections,
   currentSessionId,
-  terminalPreviews,
   onSelectSession,
   onReconnectSession,
   onCloseSession,
@@ -357,20 +355,6 @@ export default function Sidebar({
                     >
                       {s.workingDir || "~"}
                     </div>
-                    {/* 미니 터미널 프리뷰 */}
-                    {terminalPreviews[s.sessionId] && terminalPreviews[s.sessionId].length > 0 && (
-                      <div
-                        className="mt-1 mx-1 rounded overflow-hidden bg-[#252840] border border-[#2e3255]/50"
-                        style={{ height: "44px" }}
-                      >
-                        <pre
-                          className="px-1 py-0.5 text-[#7f849c] overflow-hidden whitespace-pre leading-[5.5px] select-none"
-                          style={{ fontSize: "4px", fontFamily: "monospace" }}
-                        >
-                          {terminalPreviews[s.sessionId].join("\n")}
-                        </pre>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -528,29 +512,22 @@ export default function Sidebar({
                 <div className="flex flex-col">
                   {currentSession && <SessionContextHeader session={currentSession} />}
                   <div className="px-3 pt-2 pb-3 flex flex-col gap-2">
-                    {/* 프리셋 버튼 */}
+                    {/* 프리셋 버튼: Telegram + ESC */}
                     <div className="flex flex-wrap gap-1">
-                      {[
-                        { label: "claude", cmd: "claude" },
-                        { label: "resume", cmd: "claude --resume" },
-                        { label: "telegram", cmd: "claude --channels plugin:telegram@claude-plugins-official" },
-                      ].map((preset) => (
-                        <button
-                          key={preset.cmd}
-                          onClick={() => {
-                            if (currentSession) {
-                              const termId = activeTerminalIds[currentSession.sessionId] || `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
-                              onSendCommand?.(termId, preset.cmd);
-                              setClaudeCommand("");
-                            }
-                          }}
-                          className="text-[9px] px-2 py-1 bg-[#252840] text-[#93c5fd] border border-[#3b82f6] rounded hover:bg-[#3b82f6] hover:text-white transition-colors"
-                          title={preset.cmd}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                      {/* ESC 버튼: 모바일에서 ESC 키 대용 */}
+                      <button
+                        onClick={() => {
+                          if (currentSession) {
+                            const termId = activeTerminalIds[currentSession.sessionId] || `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
+                            onSendCommand?.(termId, "claude --channels plugin:telegram@claude-plugins-official");
+                            setClaudeCommand("");
+                          }
+                        }}
+                        disabled={!currentSession || currentSession.disconnected}
+                        className="text-[9px] px-2 py-1 bg-[#252840] text-[#93c5fd] border border-[#3b82f6] rounded hover:bg-[#3b82f6] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        title="claude --channels plugin:telegram@claude-plugins-official"
+                      >
+                        telegram
+                      </button>
                       <button
                         onClick={() => {
                           if (currentSession) {
@@ -565,6 +542,26 @@ export default function Sidebar({
                         ESC
                       </button>
                     </div>
+                    {/* 방향키 버튼 */}
+                    {(() => {
+                      const sendKey = (seq: string) => {
+                        if (!currentSession) return;
+                        const termId = activeTerminalIds[currentSession.sessionId] || `term_${currentSession.connectionId}_${currentSession.sessionId.slice(-8)}`;
+                        onSendCommand?.(termId, seq);
+                      };
+                      const btnCls = "flex items-center justify-center w-6 h-6 bg-[#252840] text-[#b0b8d8] border border-[#3b82f6]/40 rounded hover:bg-[#3b82f6]/30 hover:text-white disabled:opacity-40 transition-colors text-[10px] select-none";
+                      const disabled = !currentSession || currentSession.disconnected;
+                      return (
+                        <div className="flex flex-col items-center gap-0.5">
+                          <button onPointerDown={(e) => { e.preventDefault(); sendKey('\x1b[A'); }} disabled={disabled} className={btnCls} title="↑">▲</button>
+                          <div className="flex gap-0.5">
+                            <button onPointerDown={(e) => { e.preventDefault(); sendKey('\x1b[D'); }} disabled={disabled} className={btnCls} title="←">◀</button>
+                            <button onPointerDown={(e) => { e.preventDefault(); sendKey('\x1b[B'); }} disabled={disabled} className={btnCls} title="↓">▼</button>
+                            <button onPointerDown={(e) => { e.preventDefault(); sendKey('\x1b[C'); }} disabled={disabled} className={btnCls} title="→">▶</button>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {/* 입력 창 */}
                     <input
                       type="text"

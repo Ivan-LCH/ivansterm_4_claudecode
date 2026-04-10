@@ -408,6 +408,8 @@ export function useTerminal({ connectionId, terminalId, selectedTmux, settings, 
     containerRef.current.addEventListener('mouseup', handleMouseUp, { capture: true });
     containerRef.current.addEventListener('keydown', handleKeyDown, { capture: true });
     containerRef.current.addEventListener("contextmenu", handleContextMenu, { capture: true });
+
+
     const container = containerRef.current;
     contextMenuCleanupRef.current = () => {
       selChangeSub.dispose();

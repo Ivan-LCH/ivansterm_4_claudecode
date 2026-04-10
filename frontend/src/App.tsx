@@ -80,8 +80,6 @@ function App() {
   const [reconnectSignals, setReconnectSignals] = useState<Record<string, number>>({});
   // 파일 전송 상태 (StatusBar 표시용)
   const [transferStatus, setTransferStatus] = useState<TransferStatus | null>(null);
-  // 세션별 터미널 프리뷰 (사이드바 미니 터미널용)
-  const [terminalPreviews, setTerminalPreviews] = useState<Record<string, string[]>>({});
   // 사이드바 FileTree → EditorPanel 파일 열기/로그 요청 (세션별 격리)
   const [fileOpenRequests, setFileOpenRequests] = useState<Record<string, FileOpenRequest | null>>({});
   const [tailLogRequests, setTailLogRequests] = useState<Record<string, TailLogRequest | null>>({});
@@ -308,7 +306,6 @@ function App() {
           activeSessions={sessions}
           savedConnections={connections}
           currentSessionId={currentSessionId}
-          terminalPreviews={terminalPreviews}
           sessionNotifications={sessionNotifications}
           activeTerminalIds={activeTerminalIds}
           onSelectSession={(sid) => {
@@ -391,8 +388,6 @@ function App() {
                 onSessionStatusChange={(d) => handleSessionStatusChange(s.sessionId, d)}
                 reconnectSignal={reconnectSignals[s.sessionId] || 0}
                 onTerminalPreview={(lines) => {
-                  setTerminalPreviews((prev) => ({ ...prev, [s.sessionId]: lines }));
-
                   // Claude 완료 패턴 감지: 현재 활성 세션 제외, 새로 나타난 패턴만 1회 감지
                   if (s.sessionId !== currentSessionId) {
                     const currentContent = lines.join("\n");
