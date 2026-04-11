@@ -387,11 +387,11 @@ export default function Sidebar({
                 <span className="text-[10px]">{filesExpanded ? "▾" : "▸"}</span>
               </button>
               {filesExpanded && (
-                <div className="flex flex-col" style={{ maxHeight: "280px" }}>
+                <div>
                   {currentSession && !currentSession.disconnected ? (
                     <>
                       <SessionContextHeader session={currentSession} />
-                      <div className="overflow-y-auto flex-1 min-h-0 touch-scroll">
+                      <div style={{ height: "260px" }}>
                         <FileTree
                           connectionId={currentSession.connectionId}
                           rootPath={currentSession.workingDir}
